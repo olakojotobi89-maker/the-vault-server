@@ -71,9 +71,21 @@
         .mini-avatar { width: 32px; height: 32px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); }
         .post-caption { margin-bottom: 10px; line-height: 1.4; }
         .post-media { width: 100%; border-radius: 15px; margin-bottom: 10px; max-height: 400px; object-fit: cover; }
-        .post-actions { display: flex; gap: 20px; font-size: 13px; opacity: 0.8; }
+        .post-actions { display: flex; gap: 20px; font-size: 13px; opacity: 0.8; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .delete-icon { cursor: pointer; color: rgba(255,255,255,0.4); font-size: 14px; padding: 5px; }
         .delete-icon:hover { color: #ff4b2b; }
+
+        /* Comment Section Styles */
+        .comments-section { margin-top: 10px; }
+        .comment-list { font-size: 13px; margin-bottom: 10px; max-height: 150px; overflow-y: auto; }
+        .comment-item { margin-bottom: 5px; opacity: 0.9; }
+        .comment-item b { color: #fdbb2d; margin-right: 5px; }
+        .comment-input-area { display: flex; gap: 10px; }
+        .comment-input {
+            flex: 1; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px; padding: 5px 10px; color: white; font-size: 13px; outline: none;
+        }
+        .send-comment-btn { background: none; border: none; color: #00d2ff; cursor: pointer; font-size: 16px; }
     </style>
 </head>
 <body>
@@ -133,7 +145,6 @@
             if (fileInput.files.length > 0) fileNameLabel.innerText = fileInput.files[0].name;
         };
 
-        // --- FEED LOGIC (FETCH FROM DB) ---
         async function loadFeed() {
             try {
                 const response = await fetch('/api/posts');
@@ -158,7 +169,7 @@
                             : `<img src="${post.media}" class="post-media">`;
                     }
                     
-                    renderPostHTML(postDiv, post.sender, post.caption, mediaHTML, post._id);
+                    renderPostHTML(postDiv, post.sender, post.caption, mediaHTML, post._id, post.comments || []);
                     feed.appendChild(postDiv);
                 });
             } catch (err) {
@@ -166,7 +177,6 @@
             }
         }
 
-        // --- POST LOGIC (SAVE TO DB) ---
         async function createPost() {
             const caption = document.getElementById('post-caption').value;
             const file = fileInput.files[0];
@@ -216,13 +226,13 @@
             }
         }
 
-        function renderPostHTML(container, sender, caption, media, postId) {
+        function renderPostHTML(container, sender, caption, media, postId, comments) {
             const userInitial = sender.charAt(0).toUpperCase();
-            
-            // Only show delete icon if it's MY post
-            const deleteBtn = (sender === myName) 
-                ? `<i class="fas fa-trash-alt delete-icon" onclick="deletePost('${postId}')"></i>` 
-                : '';
+            const deleteBtn = (sender === myName) ? `<i class="fas fa-trash-alt delete-icon" onclick="deletePost('${postId}')"></i>` : '';
+
+            const commentsHTML = comments.map(c => `
+                <div class="comment-item"><b>${c.user}:</b> ${c.text}</div>
+            `).join('');
 
             container.innerHTML = `
                 <div class="post-header">
@@ -235,60 +245,70 @@
                 ${media}
                 <div class="post-caption"><b>${sender}</b> ${caption}</div>
                 <div class="post-actions">
-                    <span onclick="handleLike(this)" style="cursor:pointer;"><i class="far fa-heart"></i> <span class="like-count">0</span> Likes</span>
+                    <span onclick="handleLike(this)" style="cursor:pointer;"><i class="far fa-heart"></i> <span class="like-count">0</span></span>
+                    <span style="cursor:pointer;"><i class="far fa-comment"></i> ${comments.length}</span>
+                </div>
+                <div class="comments-section">
+                    <div class="comment-list" id="comment-list-${postId}">${commentsHTML}</div>
+                    <div class="comment-input-area">
+                        <input type="text" class="comment-input" id="input-${postId}" placeholder="Write a comment...">
+                        <button class="send-comment-btn" onclick="submitComment('${postId}')"><i class="fas fa-paper-plane"></i></button>
+                    </div>
                 </div>
             `;
         }
 
-        // --- DELETE LOGIC ---
+        async function submitComment(postId) {
+            const input = document.getElementById(`input-${postId}`);
+            const text = input.value.trim();
+            if (!text) return;
+
+            try {
+                const response = await fetch(`/api/posts/${postId}/comment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user: myName, text: text })
+                });
+
+                if (response.ok) {
+                    input.value = '';
+                    loadFeed(); // Refresh to show new comment
+                }
+            } catch (err) {
+                console.error("Comment failed:", err);
+            }
+        }
+
         async function deletePost(postId) {
             if (!confirm("Delete this post forever?")) return;
-
             try {
                 const response = await fetch(`/api/posts/${postId}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: myName })
                 });
-
                 if (response.ok) {
-                    const element = document.getElementById(`post-${postId}`);
-                    element.style.opacity = '0';
-                    setTimeout(() => element.remove(), 300);
-                } else {
-                    alert("Delete failed.");
+                    document.getElementById(`post-${postId}`).remove();
                 }
             } catch (err) {
                 console.error("Error deleting:", err);
             }
         }
 
-        // --- SEARCH LOGIC ---
         async function searchUsers(query) {
             const resultsDiv = document.getElementById('search-results');
-            if (query.length < 1) {
-                resultsDiv.style.display = 'none';
-                return;
-            }
-
+            if (query.length < 1) { resultsDiv.style.display = 'none'; return; }
             try {
                 const response = await fetch(`/api/search/${query}`);
                 const users = await response.json();
-
-                if (users.length > 0) {
-                    resultsDiv.style.display = 'block';
-                    resultsDiv.innerHTML = users.map(user => `
-                        <a href="profile.html?user=${user.username}" class="search-item">
-                            <div class="mini-avatar">${user.username.charAt(0).toUpperCase()}</div>
-                            <span>${user.username}</span>
-                        </a>
-                    `).join('');
-                } else {
-                    resultsDiv.style.display = 'none';
-                }
-            } catch (err) {
-                console.error("Search failed:", err);
-            }
+                resultsDiv.style.display = users.length > 0 ? 'block' : 'none';
+                resultsDiv.innerHTML = users.map(user => `
+                    <a href="profile.html?user=${user.username}" class="search-item">
+                        <div class="mini-avatar">${user.username.charAt(0).toUpperCase()}</div>
+                        <span>${user.username}</span>
+                    </a>
+                `).join('');
+            } catch (err) { console.error("Search failed:", err); }
         }
 
         function handleLike(btn) {
@@ -306,7 +326,6 @@
             }
         }
 
-        // Run on start
         loadFeed();
     </script>
 </body>
