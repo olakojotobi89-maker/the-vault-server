@@ -11,7 +11,6 @@ const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] } 
 });
 
-// Increase limit to handle Base64 images/videos/audio
 app.use(express.json({ limit: '50mb' }));
 app.use(cors());
 app.use(express.static(path.join(__dirname)));
@@ -56,8 +55,9 @@ const Message = mongoose.model('Message', new mongoose.Schema({
     sender: { type: String, required: true },
     receiver: { type: String, required: true },
     content: { type: String, required: true },
-    type: { type: String, default: 'text' }, // 'text', 'image', 'voice'
-    timestamp: { type: Date, default: Date.now }
+    type: { type: String, default: 'text' }, 
+    timestamp: { type: Date, default: Date.now },
+    seen: { type: Boolean, default: false } // NEW: Track read status
 }));
 
 // --- API ROUTES ---
@@ -76,6 +76,18 @@ app.get('/api/chat/:user1/:user2', async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: "Could not fetch chat history" });
     }
+});
+
+// NEW: MARK MESSAGES AS READ
+app.post('/api/chat/read', async (req, res) => {
+    try {
+        const { reader, sender } = req.body;
+        await Message.updateMany(
+            { sender: sender, receiver: reader, seen: false },
+            { $set: { seen: true } }
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: "Update failed" }); }
 });
 
 // 2. DELETE MESSAGE
@@ -123,15 +135,13 @@ app.delete('/api/posts/:postId', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Delete failed" }); }
 });
 
-// 4. USER & PROFILE (UPDATED FOR FRIENDS LIST)
+// 4. USER & PROFILE
 app.get('/api/profile/:username', async (req, res) => {
     try {
-        // Populating 'username' for the friends list modal
         const user = await User.findOne({ username: req.params.username })
                                .populate('followers following', 'username');
 
         if (!user) return res.status(404).json({ error: "User not found" });
-        
         const userPosts = await Post.find({ sender: req.params.username }).sort({ timestamp: -1 });
         
         res.json({
@@ -139,8 +149,8 @@ app.get('/api/profile/:username', async (req, res) => {
             bio: user.bio,
             followersCount: user.followers.length,
             followingCount: user.following.length,
-            followers: user.followers, // Send the actual objects for the modal
-            following: user.following, // Send the actual objects for the modal
+            followers: user.followers,
+            following: user.following,
             posts: userPosts
         });
     } catch (err) { res.status(500).json({ error: "Server error" }); }
@@ -153,9 +163,7 @@ app.post('/api/follow', async (req, res) => {
         const target = await User.findOne({ username: targetUsername });
 
         if (me && target) {
-            // Check if already following using ID comparison
             const isFollowing = me.following.some(id => id.equals(target._id));
-
             if (isFollowing) {
                 me.following.pull(target._id);
                 target.followers.pull(me._id);
@@ -165,11 +173,7 @@ app.post('/api/follow', async (req, res) => {
             }
             await me.save(); 
             await target.save();
-            res.json({ 
-                success: true, 
-                isFollowingNow: !isFollowing, 
-                followerCount: target.followers.length 
-            });
+            res.json({ success: true, isFollowingNow: !isFollowing, followerCount: target.followers.length });
         }
     } catch (err) { res.status(500).json({ error: "Follow failed" }); }
 });
@@ -210,7 +214,8 @@ io.on('connection', (socket) => {
             const messageData = { 
                 ...data, 
                 _id: newMessage._id, 
-                timestamp: newMessage.timestamp 
+                timestamp: newMessage.timestamp,
+                seen: false 
             };
 
             io.to(receiver).emit('receive_message', messageData);
@@ -218,6 +223,11 @@ io.on('connection', (socket) => {
         } catch (err) {
             console.error("Socket Message Error:", err);
         }
+    });
+
+    // NEW: Notify original sender that their message was read
+    socket.on('mark_read', (data) => {
+        io.to(data.sender).emit('messages_viewed', { viewer: data.reader });
     });
 
     socket.on('send_like', (data) => {
