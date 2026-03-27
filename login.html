@@ -102,16 +102,12 @@
     </div>
 
     <script>
-    // --- NETWORK CONFIG ---
-    const SERVER_IP = "192.168.222.247"; // Your Computer's IP
-    const PORT = "3000";
-
     async function handleAuth(type) {
         const username = document.getElementById('usernameInput').value;
         const password = document.getElementById('passwordInput').value;
 
-        // UPDATED: Now points to your network IP instead of localhost
-        const url = `http://${SERVER_IP}:${PORT}/api/${type}`;
+        // FIXED: Removed SERVER_IP. Using relative path for Render Cloud.
+        const url = `/api/${type}`;
 
         try {
             const response = await fetch(url, {
@@ -123,15 +119,17 @@
             const data = await response.json();
 
             if (response.ok) {
+                // Save the username for index.html to use
                 localStorage.setItem('vault_username', username);
-                alert(data.message);
-                if(type === 'login') window.location.href = 'index.html'; 
+                
+                // Redirect to the dashboard
+                window.location.href = 'index.html'; 
             } else {
                 alert("Error: " + data.error);
             }
         } catch (err) {
             console.error(err);
-            alert("Connection Failed! Ensure server.js is running and your phone is on the same Wi-Fi.");
+            alert("Connection Failed! Please try again in a moment.");
         }
     }
 

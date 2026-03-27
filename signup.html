@@ -93,15 +93,15 @@
         e.preventDefault();
         
         const username = document.getElementById('reg-user').value;
-        const email = document.getElementById('reg-email').value; // GRAB EMAIL
-        const phone = document.getElementById('reg-phone').value; // GRAB PHONE
+        const email = document.getElementById('reg-email').value;
+        const phone = document.getElementById('reg-phone').value;
         const password = document.getElementById('reg-pass').value;
 
         try {
-            const response = await fetch('http://localhost:3000/api/signup', {
+            // FIXED: Removed localhost so it works on Render
+            const response = await fetch('/api/signup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // UPDATED BODY TO SEND EMAIL AND PHONE
                 body: JSON.stringify({ username, password, email, phone })
             });
 
@@ -109,12 +109,12 @@
 
             if (response.ok) {
                 alert("Account created! Redirecting to login...");
-                window.location.href = 'login.html';
+                window.location.href = 'login.html'; // REDIRECT TO LOGIN
             } else {
                 alert("Error: " + data.error);
             }
         } catch (err) {
-            alert("Server is offline. Check your terminal!");
+            alert("Could not connect to the vault. Please try again in a moment!");
         }
     };
     </script>
