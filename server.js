@@ -4,7 +4,7 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
-const path = require('path'); // Added surgically for file handling
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,42 +14,30 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
-
-// --- SERVE FRONTEND FILES ---
-// This allows Render to serve your index.html, CSS, and JS files
 app.use(express.static(path.join(__dirname)));
 
-// --- HOME ROUTE ---
-// This fixes the "Cannot GET /" error by sending your main HTML file
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // --- MONGODB CONNECTION ---
-// Updated to modern SRV string for better Render compatibility
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://olakojotobi89_db_user:VaultPass2026@cluster0.fuesl9b.mongodb.net/vaultDB?retryWrites=true&w=majority";
 
-mongoose.connect(MONGO_URI, {
-    serverSelectionTimeoutMS: 10000 // Giving it 10 seconds for mobile data lag
-})
+mongoose.connect(MONGO_URI)
     .then(() => console.log("☁️ Connected to MongoDB Cloud!"))
-    .catch(err => {
-        console.error("❌ MongoDB Connection Error!");
-        console.log("Check if your Hotspot is blocking Port 27017. If so, turn on a VPN.");
-    });
+    .catch(err => console.error("❌ MongoDB Connection Error:", err));
 
 // --- DATABASE SCHEMAS ---
+
+// UPDATED: Added followers, following, and bio to User
 const User = mongoose.model('User', new mongoose.Schema({
     username: { type: String, unique: true, required: true },
     password: { type: String, required: true },
     email: String,
-    phone: String
-}));
-
-const Message = mongoose.model('Message', new mongoose.Schema({
-    sender: String,
-    content: String,
-    timestamp: { type: Date, default: Date.now }
+    phone: String,
+    bio: { type: String, default: "Welcome to my vault." },
+    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }));
 
 const Post = mongoose.model('Post', new mongoose.Schema({
@@ -60,26 +48,74 @@ const Post = mongoose.model('Post', new mongoose.Schema({
     timestamp: { type: Date, default: Date.now }
 }));
 
-const PasswordReset = mongoose.model('PasswordReset', new mongoose.Schema({
-    username: String,
-    otp: String,
-    expiresAt: Date
-}));
-
-const Comment = mongoose.model('Comment', new mongoose.Schema({
-    post_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Post' },
+const Message = mongoose.model('Message', new mongoose.Schema({
     sender: String,
-    content: String
+    content: String,
+    timestamp: { type: Date, default: Date.now }
 }));
-
-// --- EMAIL SETUP ---
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com', port: 465, secure: true,
-    auth: { user: 'olakojotobi89@gmail.com', pass: 'khbxbiccyqcjzokg' },
-    tls: { rejectUnauthorized: false }
-});
 
 // --- API ROUTES ---
+
+// NEW: Get Profile Data (Followers, Following, Bio)
+app.get('/api/profile/:username', async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.username })
+            .populate('followers', 'username')
+            .populate('following', 'username');
+        
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        const userPosts = await Post.find({ sender: req.params.username }).sort({ timestamp: -1 });
+
+        res.json({
+            username: user.username,
+            bio: user.bio,
+            followersCount: user.followers.length,
+            followingCount: user.following.length,
+            posts: userPosts,
+            // Check if a specific user is already following this profile
+            followersList: user.followers.map(f => f.username) 
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Server error fetching profile" });
+    }
+});
+
+// NEW: Follow/Unfollow Logic
+app.post('/api/follow', async (req, res) => {
+    const { myUsername, targetUsername } = req.body;
+    if (myUsername === targetUsername) return res.status(400).json({ error: "You cannot follow yourself" });
+
+    try {
+        const me = await User.findOne({ username: myUsername });
+        const target = await User.findOne({ username: targetUsername });
+
+        if (!me || !target) return res.status(404).json({ error: "User not found" });
+
+        const isFollowing = me.following.includes(target._id);
+
+        if (isFollowing) {
+            // Unfollow
+            me.following.pull(target._id);
+            target.followers.pull(me._id);
+        } else {
+            // Follow
+            me.following.push(target._id);
+            target.followers.push(me._id);
+        }
+
+        await me.save();
+        await target.save();
+
+        res.json({ 
+            success: true, 
+            isFollowingNow: !isFollowing,
+            followerCount: target.followers.length 
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Follow action failed" });
+    }
+});
 
 app.post('/api/login', async (req, res) => {
     try {
@@ -102,7 +138,7 @@ app.post('/api/signup', async (req, res) => {
     }
 });
 
-// Socket.io Real-time Chat logic
+// Real-time Chat
 io.on('connection', (socket) => {
     socket.on('send_message', async (data) => {
         try {
@@ -115,5 +151,4 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 VAULT SERVER IS ACTIVE ON PORT ${PORT}`);
-    console.log(`🔗 Multi-device cloud mode enabled.`);
 });
