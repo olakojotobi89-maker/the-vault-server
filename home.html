@@ -9,7 +9,6 @@
         if (!localStorage.getItem('vault_username')) {
             window.location.href = 'index.html';
         }
-
         function logoutVault() {
             localStorage.removeItem('vault_username');
             window.location.href = 'index.html';
@@ -18,149 +17,61 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root {
-            --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%);
-        }
+        :root { --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); }
         body {
-            margin: 0;
-            padding: 20px 0;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
+            margin: 0; padding: 20px 0; min-height: 100vh;
+            display: flex; justify-content: center;
             background: var(--primary-gradient);
-            font-family: -apple-system, sans-serif;
-            color: white;
+            font-family: -apple-system, sans-serif; color: white;
         }
-        .home-container {
-            width: 95%;
-            max-width: 500px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
+        .home-container { width: 95%; max-width: 500px; display: flex; flex-direction: column; gap: 20px; }
         .glass-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(20px);
-            border-radius: 30px;
-            padding: 25px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px);
+            border-radius: 30px; padding: 25px; border: 1px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 15px 35px rgba(0,0,0,0.3);
         }
-        /* Navigation Section */
-        .nav-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-top: 20px;
+        
+        /* Search Box Styles */
+        .search-container { position: relative; margin-bottom: 20px; }
+        .search-input {
+            width: 100%; padding: 12px 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1); color: white; outline: none; box-sizing: border-box;
         }
+        .search-results {
+            position: absolute; width: 100%; top: 50px; background: #1a1a1a;
+            border-radius: 15px; z-index: 1000; display: none; overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+        .search-item {
+            padding: 12px; display: flex; align-items: center; gap: 10px;
+            text-decoration: none; color: white; border-bottom: 1px solid #333;
+        }
+        .search-item:hover { background: rgba(255,255,255,0.1); }
+
+        .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
         .nav-item {
-            background: rgba(255, 255, 255, 0.15);
-            padding: 15px;
-            border-radius: 20px;
-            text-decoration: none;
-            color: white;
-            text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            cursor: pointer;
-            transition: 0.3s;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 5px;
-            font-size: 13px;
+            background: rgba(255, 255, 255, 0.15); padding: 15px; border-radius: 20px;
+            text-decoration: none; color: white; text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; transition: 0.3s;
+            display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 13px;
         }
         .nav-item i { font-size: 18px; }
-        .nav-item:hover { background: rgba(255, 255, 255, 0.25); }
+        .chat-link { grid-column: span 2; background: linear-gradient(to right, #00d2ff, #3a7bd5); flex-direction: row; justify-content: center; font-weight: bold; }
         
-        .chat-link {
-            grid-column: span 2;
-            background: linear-gradient(to right, #00d2ff, #3a7bd5);
-            flex-direction: row;
-            justify-content: center;
-            font-weight: bold;
-        }
-
-        /* Post Input Section */
-        .post-input-box {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-        textarea {
-            width: 100%;
-            background: transparent;
-            border: none;
-            color: white;
-            outline: none;
-            resize: none;
-            font-size: 16px;
-            margin-bottom: 10px;
-        }
-        .media-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            padding-top: 10px;
-        }
+        .post-input-box { background: rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 15px; margin-bottom: 20px; }
+        textarea { width: 100%; background: transparent; border: none; color: white; outline: none; resize: none; font-size: 16px; margin-bottom: 10px; }
+        .media-controls { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; }
         .upload-label { cursor: pointer; font-size: 20px; color: #00d2ff; }
-        .post-btn {
-            background: #fdbb2d;
-            border: none;
-            padding: 8px 25px;
-            border-radius: 12px;
-            font-weight: bold;
-            cursor: pointer;
-        }
+        .post-btn { background: #fdbb2d; border: none; padding: 8px 25px; border-radius: 12px; font-weight: bold; cursor: pointer; }
 
-        /* Post Cards */
         #feed-display { display: flex; flex-direction: column; gap: 15px; }
-        .post {
-            background: rgba(0, 0, 0, 0.25);
-            border-radius: 20px;
-            padding: 15px;
-            overflow: hidden;
-        }
-        .post-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 12px;
-        }
-        .post-user-link {
-            text-decoration: none;
-            color: #00d2ff;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .mini-avatar {
-            width: 32px;
-            height: 32px;
-            background: #333;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
+        .post { background: rgba(0, 0, 0, 0.25); border-radius: 20px; padding: 15px; }
+        .post-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .post-user-link { text-decoration: none; color: #00d2ff; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+        .mini-avatar { width: 32px; height: 32px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); }
         .post-caption { margin-bottom: 10px; line-height: 1.4; }
-        .post-media {
-            width: 100%;
-            border-radius: 15px;
-            margin-bottom: 10px;
-            max-height: 400px;
-            object-fit: cover;
-        }
-        .post-actions {
-            display: flex;
-            gap: 20px;
-            font-size: 13px;
-            opacity: 0.8;
-        }
+        .post-media { width: 100%; border-radius: 15px; margin-bottom: 10px; max-height: 400px; object-fit: cover; }
+        .post-actions { display: flex; gap: 20px; font-size: 13px; opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -174,11 +85,7 @@
 
             <div class="nav-grid">
                 <a href="chat.html" class="nav-item chat-link"><i class="fas fa-comments"></i> <span>Open Private Chat</span></a>
-                
-                <a id="my-profile-link" href="#" class="nav-item">
-                    <i class="fas fa-user-circle"></i> <span>My Profile</span>
-                </a>
-                
+                <a id="my-profile-link" href="#" class="nav-item"><i class="fas fa-user-circle"></i> <span>My Profile</span></a>
                 <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i> <span>Settings</span></a>
                 <div onclick="logoutVault()" class="nav-item" style="grid-column: span 2; flex-direction: row; justify-content: center; background: rgba(255,0,0,0.1);">
                     <i class="fas fa-lock"></i> <span>Lock Vault</span>
@@ -187,6 +94,11 @@
         </div>
 
         <div class="glass-card">
+            <div class="search-container">
+                <input type="text" id="search-input" class="search-input" placeholder="🔍 Search users..." oninput="searchUsers(this.value)">
+                <div id="search-results" class="search-results"></div>
+            </div>
+
             <div style="font-weight: bold; margin-bottom: 15px;"><i class="fas fa-rss"></i> Feed</div>
             
             <div class="post-input-box">
@@ -208,24 +120,47 @@
     <script>
         const myName = localStorage.getItem('vault_username') || 'Guest';
         document.getElementById('user-greeting').innerText = myName;
-        
-        // Update "My Profile" link dynamically
         document.getElementById('my-profile-link').href = `profile.html?user=${myName}`;
 
+        // SEARCH LOGIC
+        async function searchUsers(query) {
+            const resultsDiv = document.getElementById('search-results');
+            if (query.length < 1) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/search/${query}`);
+                const users = await response.json();
+
+                if (users.length > 0) {
+                    resultsDiv.style.display = 'block';
+                    resultsDiv.innerHTML = users.map(user => `
+                        <a href="profile.html?user=${user.username}" class="search-item">
+                            <div class="mini-avatar">${user.username.charAt(0).toUpperCase()}</div>
+                            <span>${user.username}</span>
+                        </a>
+                    `).join('');
+                } else {
+                    resultsDiv.style.display = 'none';
+                }
+            } catch (err) {
+                console.error("Search failed:", err);
+            }
+        }
+
+        // POST LOGIC
         const fileInput = document.getElementById('media-upload');
         const fileNameLabel = document.getElementById('file-name');
 
         fileInput.onchange = () => {
-            if (fileInput.files.length > 0) {
-                fileNameLabel.innerText = fileInput.files[0].name;
-            }
+            if (fileInput.files.length > 0) fileNameLabel.innerText = fileInput.files[0].name;
         };
 
         function createPost() {
             const caption = document.getElementById('post-caption').value;
             const file = fileInput.files[0];
-            const feed = document.getElementById('feed-display');
-
             if (!caption && !file) return;
 
             const postDiv = document.createElement('div');
@@ -235,12 +170,9 @@
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const src = e.target.result;
-                    let mediaHTML = '';
-                    if (file.type.startsWith('image/')) {
-                        mediaHTML = `<img src="${src}" class="post-media">`;
-                    } else if (file.type.startsWith('video/')) {
-                        mediaHTML = `<video src="${src}" class="post-media" controls></video>`;
-                    }
+                    let mediaHTML = file.type.startsWith('image/') 
+                        ? `<img src="${src}" class="post-media">` 
+                        : `<video src="${src}" class="post-media" controls></video>`;
                     finishPost(postDiv, caption, mediaHTML);
                 };
                 reader.readAsDataURL(file);
@@ -250,9 +182,7 @@
         }
 
         function finishPost(container, caption, media) {
-            // Instagram-style header with clickable profile link
             const userInitial = myName.charAt(0).toUpperCase();
-            
             container.innerHTML = `
                 <div class="post-header">
                     <a href="profile.html?user=${myName}" class="post-user-link">
@@ -264,19 +194,9 @@
                 <div class="post-caption">${caption}</div>
                 <div class="post-actions">
                     <span onclick="handleLike(this)" style="cursor:pointer;"><i class="far fa-heart"></i> <span class="like-count">0</span> Likes</span>
-                    <span onclick="toggleComments(this)" style="cursor:pointer;"><i class="far fa-comment"></i> Comment</span>
-                </div>
-                <div class="comment-section" style="display:none; margin-top:10px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
-                    <div class="comment-list" style="font-size:12px; margin-bottom:10px;"></div>
-                    <div style="display:flex; gap:5px;">
-                        <input type="text" class="comm-input" placeholder="Add a comment..." 
-                               style="flex:1; background:rgba(255,255,255,0.1); border:none; color:white; padding:8px; border-radius:10px; outline:none;">
-                        <button onclick="addComment(this)" style="background:#00d2ff; border:none; border-radius:10px; color:white; padding:0 15px; cursor:pointer;">Send</button>
-                    </div>
                 </div>
             `;
             document.getElementById('feed-display').prepend(container);
-            
             document.getElementById('post-caption').value = '';
             fileInput.value = '';
             fileNameLabel.innerText = 'No file selected';
@@ -286,7 +206,6 @@
             const icon = btn.querySelector('i');
             const countSpan = btn.querySelector('.like-count');
             let count = parseInt(countSpan.innerText);
-
             if (icon.classList.contains('far')) {
                 icon.classList.replace('far', 'fas');
                 icon.style.color = "#ff4b2b";
@@ -295,25 +214,6 @@
                 icon.classList.replace('fas', 'far');
                 icon.style.color = "white";
                 countSpan.innerText = count - 1;
-            }
-        }
-
-        function toggleComments(btn) {
-            const post = btn.closest('.post');
-            const section = post.querySelector('.comment-section');
-            section.style.display = section.style.display === 'none' ? 'block' : 'none';
-        }
-
-        function addComment(btn) {
-            const section = btn.closest('.comment-section');
-            const input = section.querySelector('.comm-input');
-            const list = section.querySelector('.comment-list');
-            if (input.value.trim() !== "") {
-                const newComm = document.createElement('div');
-                newComm.style.marginBottom = "5px";
-                newComm.innerHTML = `<b style="color:#00d2ff;">${myName}:</b> ${input.value}`;
-                list.appendChild(newComm);
-                input.value = '';
             }
         }
     </script>
