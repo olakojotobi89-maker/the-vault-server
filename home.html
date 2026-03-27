@@ -6,12 +6,10 @@
     <title>BBNT | Home</title>
 
     <script>
-        // SECURITY GUARD: If not logged in, kick them back to index.html
         if (!localStorage.getItem('vault_username')) {
             window.location.href = 'index.html';
         }
 
-        // LOGOUT FUNCTION
         function logoutVault() {
             localStorage.removeItem('vault_username');
             window.location.href = 'index.html';
@@ -65,13 +63,21 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             cursor: pointer;
             transition: 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
         }
-        .nav-item:hover {
-            background: rgba(255, 255, 255, 0.25);
-        }
+        .nav-item i { font-size: 18px; }
+        .nav-item:hover { background: rgba(255, 255, 255, 0.25); }
+        
         .chat-link {
             grid-column: span 2;
             background: linear-gradient(to right, #00d2ff, #3a7bd5);
+            flex-direction: row;
+            justify-content: center;
+            font-weight: bold;
         }
 
         /* Post Input Section */
@@ -98,11 +104,7 @@
             border-top: 1px solid rgba(255,255,255,0.1);
             padding-top: 10px;
         }
-        .upload-label {
-            cursor: pointer;
-            font-size: 20px;
-            color: #00d2ff;
-        }
+        .upload-label { cursor: pointer; font-size: 20px; color: #00d2ff; }
         .post-btn {
             background: #fdbb2d;
             border: none;
@@ -120,7 +122,31 @@
             padding: 15px;
             overflow: hidden;
         }
-        .post-user { font-weight: bold; color: #00d2ff; margin-bottom: 8px; }
+        .post-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .post-user-link {
+            text-decoration: none;
+            color: #00d2ff;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .mini-avatar {
+            width: 32px;
+            height: 32px;
+            background: #333;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
         .post-caption { margin-bottom: 10px; line-height: 1.4; }
         .post-media {
             width: 100%;
@@ -148,8 +174,15 @@
 
             <div class="nav-grid">
                 <a href="chat.html" class="nav-item chat-link"><i class="fas fa-comments"></i> <span>Open Private Chat</span></a>
+                
+                <a id="my-profile-link" href="#" class="nav-item">
+                    <i class="fas fa-user-circle"></i> <span>My Profile</span>
+                </a>
+                
                 <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i> <span>Settings</span></a>
-                <div onclick="logoutVault()" class="nav-item"><i class="fas fa-lock"></i> <span>Lock Vault</span></div>
+                <div onclick="logoutVault()" class="nav-item" style="grid-column: span 2; flex-direction: row; justify-content: center; background: rgba(255,0,0,0.1);">
+                    <i class="fas fa-lock"></i> <span>Lock Vault</span>
+                </div>
             </div>
         </div>
 
@@ -157,7 +190,7 @@
             <div style="font-weight: bold; margin-bottom: 15px;"><i class="fas fa-rss"></i> Feed</div>
             
             <div class="post-input-box">
-                <textarea id="post-caption" placeholder="Write a caption..." rows="2"></textarea>
+                <textarea id="post-caption" placeholder="What's on your mind?..." rows="2"></textarea>
                 <div class="media-controls">
                     <label class="upload-label">
                         <i class="fas fa-camera"></i>
@@ -173,9 +206,11 @@
     </div>
 
     <script>
-        // Set the greeting name from localStorage
         const myName = localStorage.getItem('vault_username') || 'Guest';
         document.getElementById('user-greeting').innerText = myName;
+        
+        // Update "My Profile" link dynamically
+        document.getElementById('my-profile-link').href = `profile.html?user=${myName}`;
 
         const fileInput = document.getElementById('media-upload');
         const fileNameLabel = document.getElementById('file-name');
@@ -196,12 +231,11 @@
             const postDiv = document.createElement('div');
             postDiv.className = 'post';
 
-            let mediaHTML = '';
-            
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const src = e.target.result;
+                    let mediaHTML = '';
                     if (file.type.startsWith('image/')) {
                         mediaHTML = `<img src="${src}" class="post-media">`;
                     } else if (file.type.startsWith('video/')) {
@@ -216,8 +250,16 @@
         }
 
         function finishPost(container, caption, media) {
+            // Instagram-style header with clickable profile link
+            const userInitial = myName.charAt(0).toUpperCase();
+            
             container.innerHTML = `
-                <div class="post-user">${myName}</div>
+                <div class="post-header">
+                    <a href="profile.html?user=${myName}" class="post-user-link">
+                        <div class="mini-avatar">${userInitial}</div>
+                        <span>${myName}</span>
+                    </a>
+                </div>
                 ${media}
                 <div class="post-caption">${caption}</div>
                 <div class="post-actions">
