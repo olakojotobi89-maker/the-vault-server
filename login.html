@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Private Vault | Login</title>
+    
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, sans-serif;
+            overflow: hidden;
+        }
+        .login-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 40px 30px;
+            border-radius: 40px;
+            width: 85%;
+            max-width: 350px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 40px 60px rgba(0, 0, 0, 0.3);
+        }
+        .avatar {
+            font-size: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+        input {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 15px;
+            border: none;
+            outline: none;
+            box-sizing: border-box;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 15px;
+            border-radius: 15px;
+            border: none;
+            background: #00d2ff;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        .auth-links {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .link {
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        .link:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <div class="avatar">🔒</div>
+        <h2>Private Vault</h2>
+        <p>Enter your custom password</p>
+        
+        <form id="loginForm">
+            <input type="text" id="usernameInput" placeholder="Username" required>
+            <input type="password" id="passwordInput" placeholder="Password" required>
+            <button type="submit" class="login-btn">Unlock Chat</button>
+        </form>
+
+        <div class="auth-links">
+            <a href="forgot.html" class="link">Forgot Password?</a>
+            <a href="signup.html" class="link">Don't have an account? Register</a>
+        </div>
+    </div>
+
+    <script>
+    // --- NETWORK CONFIG ---
+    const SERVER_IP = "192.168.222.247"; // Your Computer's IP
+    const PORT = "3000";
+
+    async function handleAuth(type) {
+        const username = document.getElementById('usernameInput').value;
+        const password = document.getElementById('passwordInput').value;
+
+        // UPDATED: Now points to your network IP instead of localhost
+        const url = `http://${SERVER_IP}:${PORT}/api/${type}`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                localStorage.setItem('vault_username', username);
+                alert(data.message);
+                if(type === 'login') window.location.href = 'index.html'; 
+            } else {
+                alert("Error: " + data.error);
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Connection Failed! Ensure server.js is running and your phone is on the same Wi-Fi.");
+        }
+    }
+
+    document.getElementById('loginForm').onsubmit = (e) => {
+        e.preventDefault();
+        handleAuth('login');
+    };
+    </script>
+
+</body>
+</html>

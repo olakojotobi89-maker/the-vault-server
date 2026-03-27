@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BBNT | Recovery</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            margin: 0; padding: 0; height: 100vh; display: flex;
+            justify-content: center; align-items: center;
+            background: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%);
+            font-family: -apple-system, sans-serif; color: white;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px);
+            border-radius: 30px; padding: 30px; width: 90%; max-width: 350px;
+            border: 1px solid rgba(255, 255, 255, 0.2); text-align: center;
+        }
+        input {
+            width: 100%; padding: 15px; margin-top: 15px; border-radius: 12px;
+            border: none; background: rgba(255, 255, 255, 0.2); color: white; outline: none;
+        }
+        input::placeholder { color: rgba(255,255,255,0.6); }
+        .btn {
+            width: 100%; padding: 15px; margin-top: 20px; border-radius: 12px;
+            border: none; background: #fdbb2d; color: #1a2a6c; font-weight: bold; cursor: pointer;
+        }
+        .link { display: block; margin-top: 15px; color: white; text-decoration: none; font-size: 14px; opacity: 0.8; }
+        #reset-form { display: none; } /* Hidden initially */
+    </style>
+</head>
+<body>
+
+    <div class="glass-card">
+        <i class="fas fa-key" style="font-size: 40px; margin-bottom: 10px;"></i>
+        
+        <div id="request-form">
+            <h2>Recover Account</h2>
+            <p style="font-size: 13px;">Enter your Email or Phone number</p>
+            <input type="text" id="contact" placeholder="Email or Phone">
+            <button class="btn" onclick="sendOTP()">Send Recovery Code</button>
+        </div>
+
+        <div id="reset-form">
+            <h2>Reset Password</h2>
+            <p style="font-size: 13px;">Enter the 6-digit code from your terminal</p>
+            <input type="text" id="otp" placeholder="6-Digit Code">
+            <input type="password" id="new-pass" placeholder="New Password">
+            <button class="btn" style="background: #00d2ff;" onclick="verifyAndReset()">Update Password</button>
+        </div>
+
+        <a href="login.html" class="link">Back to Login</a>
+    </div>
+
+    <script>
+        let currentUser = "";
+
+        async function sendOTP() {
+            const contact = document.getElementById('contact').value;
+            if(!contact) return alert("Please enter your info");
+
+            const res = await fetch('http://localhost:3000/api/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contact })
+            });
+
+            const data = await res.json();
+            if(res.ok) {
+                currentUser = data.username;
+                document.getElementById('request-form').style.display = 'none';
+                document.getElementById('reset-form').style.display = 'block';
+                alert("Check your Server Terminal for the 6-digit code!");
+            } else {
+                alert(data.error);
+            }
+        }
+
+        async function verifyAndReset() {
+            const otp = document.getElementById('otp').value;
+            const newPassword = document.getElementById('new-pass').value;
+
+            if(!otp || !newPassword) return alert("Fill all fields");
+
+            const res = await fetch('http://localhost:3000/api/verify-and-reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser, otp, newPassword })
+            });
+
+            if(res.ok) {
+                alert("Success! Password changed.");
+                window.location.href = "login.html";
+            } else {
+                const data = await res.json();
+                alert(data.error);
+            }
+        }
+    </script>
+</body>
+</html>

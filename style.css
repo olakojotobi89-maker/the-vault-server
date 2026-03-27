@@ -1,0 +1,195 @@
+/* --- Global Reset & Background --- */
+:root {
+    --glass: rgba(255, 255, 255, 0.2);
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--primary-gradient); /* This makes the glass effect visible */
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+/* --- Login Page Styles --- */
+.login-card {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 40px 30px;
+    border-radius: 40px;
+    width: 85%;
+    max-width: 350px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 40px 60px rgba(0, 0, 0, 0.3);
+    animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-15px); }
+}
+
+.avatar-wrapper {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+}
+
+.avatar {
+    font-size: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    box-shadow: 0 0 20px rgba(0, 210, 255, 0.5);
+}
+
+.input-group {
+    margin-bottom: 20px;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 15px;
+    border-radius: 15px;
+    border: none;
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 16px; 
+    outline: none;
+    box-sizing: border-box;
+    transition: 0.3s;
+}
+
+.login-btn {
+    width: 100%;
+    padding: 15px;
+    border-radius: 15px;
+    border: none;
+    background: linear-gradient(to right, #00d2ff, #3a7bd5);
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* --- Chat Page Styles --- */
+.chat-container {
+    width: 95vw;
+    max-width: 400px;
+    height: 90vh;
+    background: var(--glass);
+    backdrop-filter: blur(15px);
+    border-radius: 30px;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.chat-header {
+    background: rgba(0, 0, 0, 0.2);
+    color: #fff;
+    padding: 20px;
+    text-align: center;
+    border-top-left-radius: 30px;
+    border-top-right-radius: 30px;
+}
+
+.chat-messages {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.message {
+    padding: 12px;
+    border-radius: 15px;
+    max-width: 70%;
+    color: #333;
+}
+
+.received { background: white; align-self: flex-start; }
+.sent { background: #00d2ff; color: white; align-self: flex-end; }
+
+.chat-input {
+    display: flex;
+    padding: 20px;
+    background: rgba(0,0,0,0.1);
+    gap: 10px;
+}
+
+.chat-input input {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 20px;
+    outline: none;
+}
+/* --- Chat Enhancements --- */
+.user-info { display: flex; align-items: center; gap: 10px; font-weight: bold; }
+.status-dot { width: 10px; height: 10px; background: #00ff88; border-radius: 50%; box-shadow: 0 0 10px #00ff88; }
+
+.call-actions { display: flex; gap: 15px; }
+.icon-btn { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; opacity: 0.8; }
+.video-call { color: #00d2ff; text-shadow: 0 0 10px rgba(0,210,255,0.5); }
+
+.timer-bar {
+    background: rgba(0,0,0,0.2);
+    padding: 8px;
+    font-size: 12px;
+    color: #00d2ff;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.timer-bar select {
+    background: none;
+    border: none;
+    color: #00d2ff;
+    font-weight: bold;
+    outline: none;
+}
+
+.chat-input-area {
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom-left-radius: 30px;
+    border-bottom-right-radius: 30px;
+}
+
+.chat-input-area input {
+    flex: 1;
+    background: rgba(255,255,255,0.9);
+    border: none;
+    padding: 12px 18px;
+    border-radius: 25px;
+    font-size: 15px;
+}
+
+.media-actions i { font-size: 1.5rem; color: white; cursor: pointer; }
+.mic-btn { background: none; border: none; color: white; font-size: 1.2rem; }
+.send-btn { background: #764ba2; border: none; color: white; width: 40px; height: 40px; border-radius: 50%; }
+
+/* iPhone Swipe-up Area Protection */
+@media only screen and (max-width: 600px) {
+    .chat-input-area { padding-bottom: 30px; }
+}
