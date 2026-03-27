@@ -45,7 +45,6 @@ const Post = mongoose.model('Post', new mongoose.Schema({
     media: String, 
     type: String,  
     timestamp: { type: Date, default: Date.now },
-    // Stores comments with user and text
     comments: [{
         user: String,
         text: String,
@@ -54,86 +53,78 @@ const Post = mongoose.model('Post', new mongoose.Schema({
 }));
 
 const Message = mongoose.model('Message', new mongoose.Schema({
-    sender: String,
-    content: String,
+    sender: { type: String, required: true },
+    receiver: { type: String, required: true },
+    content: { type: String, required: true },
+    type: { type: String, default: 'text' }, // 'text', 'image', 'voice'
     timestamp: { type: Date, default: Date.now }
 }));
 
 // --- API ROUTES ---
 
-// Add Comment to a Post
-app.post('/api/posts/:postId/comment', async (req, res) => {
+// 1. CHAT HISTORY: Fetch messages between two specific users
+app.get('/api/chat/:user1/:user2', async (req, res) => {
     try {
-        const { user, text } = req.body;
-        const post = await Post.findById(req.params.postId);
-        
-        if (!post) return res.status(404).json({ error: "Post not found" });
-
-        post.comments.push({ user, text });
-        await post.save();
-        
-        res.json({ success: true, comments: post.comments });
+        const { user1, user2 } = req.params;
+        const messages = await Message.find({
+            $or: [
+                { sender: user1, receiver: user2 },
+                { sender: user2, receiver: user1 }
+            ]
+        }).sort({ timestamp: 1 });
+        res.json(messages);
     } catch (err) {
-        res.status(500).json({ error: "Could not add comment" });
+        res.status(500).json({ error: "Could not fetch chat history" });
     }
 });
 
-// Delete Post Route
-app.delete('/api/posts/:postId', async (req, res) => {
+// 2. DELETE MESSAGE: Securely remove a message
+app.delete('/api/chat/:messageId', async (req, res) => {
     try {
-        const { username } = req.body; 
-        const post = await Post.findById(req.params.postId);
+        const { username } = req.body;
+        const msg = await Message.findById(req.params.messageId);
+        
+        if (!msg) return res.status(404).json({ error: "Message not found" });
+        if (msg.sender !== username) return res.status(403).json({ error: "Unauthorized" });
 
-        if (!post) return res.status(404).json({ error: "Post not found" });
-
-        // Security Check: Only the owner can delete
-        if (post.sender !== username) {
-            return res.status(403).json({ error: "Unauthorized" });
-        }
-
-        await Post.findByIdAndDelete(req.params.postId);
-        res.json({ success: true, message: "Post deleted" });
+        await Message.findByIdAndDelete(req.params.messageId);
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: "Delete failed" });
     }
 });
 
-// Search for Users
-app.get('/api/search/:query', async (req, res) => {
-    try {
-        const query = req.params.query;
-        const users = await User.find({ 
-            username: { $regex: '^' + query, $options: 'i' } 
-        }).select('username').limit(5);
-        res.json(users);
-    } catch (err) {
-        res.status(500).json({ error: "Search failed" });
-    }
-});
-
-// Create a New Post
+// 3. POSTS & FEED
 app.post('/api/posts', async (req, res) => {
     try {
         const { sender, caption, media, type } = req.body;
         const newPost = new Post({ sender, caption, media, type });
         await newPost.save();
         res.json({ success: true, post: newPost });
-    } catch (err) {
-        res.status(500).json({ error: "Could not save post" });
-    }
+    } catch (err) { res.status(500).json({ error: "Save failed" }); }
 });
 
-// Fetch Feed (Sorted by newest first)
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(20);
         res.json(posts);
-    } catch (err) {
-        res.status(500).json({ error: "Could not fetch feed" });
-    }
+    } catch (err) { res.status(500).json({ error: "Fetch failed" }); }
 });
 
-// Profile Logic
+app.delete('/api/posts/:postId', async (req, res) => {
+    try {
+        const { username } = req.body; 
+        const post = await Post.findById(req.params.postId);
+        if (post && post.sender === username) {
+            await Post.findByIdAndDelete(req.params.postId);
+            res.json({ success: true });
+        } else {
+            res.status(403).json({ error: "Unauthorized" });
+        }
+    } catch (err) { res.status(500).json({ error: "Delete failed" }); }
+});
+
+// 4. USER & PROFILE
 app.get('/api/profile/:username', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.params.username });
@@ -146,34 +137,35 @@ app.get('/api/profile/:username', async (req, res) => {
             followingCount: user.following.length,
             posts: userPosts
         });
-    } catch (err) {
-        res.status(500).json({ error: "Server error" });
-    }
+    } catch (err) { res.status(500).json({ error: "Server error" }); }
 });
 
-// Follow/Unfollow Logic
 app.post('/api/follow', async (req, res) => {
     const { myUsername, targetUsername } = req.body;
     try {
         const me = await User.findOne({ username: myUsername });
         const target = await User.findOne({ username: targetUsername });
-        if (!me || !target) return res.status(404).json({ error: "User not found" });
-
-        const isFollowing = me.following.includes(target._id);
-        if (isFollowing) {
-            me.following.pull(target._id);
-            target.followers.pull(me._id);
-        } else {
-            me.following.push(target._id);
-            target.followers.push(me._id);
+        if (me && target) {
+            const isFollowing = me.following.includes(target._id);
+            if (isFollowing) {
+                me.following.pull(target._id);
+                target.followers.pull(me._id);
+            } else {
+                me.following.push(target._id);
+                target.followers.push(me._id);
+            }
+            await me.save(); await target.save();
+            res.json({ success: true, isFollowingNow: !isFollowing, followerCount: target.followers.length });
         }
-        await me.save();
-        await target.save();
-        res.json({ success: true, isFollowingNow: !isFollowing, followerCount: target.followers.length });
     } catch (err) { res.status(500).json({ error: "Follow failed" }); }
 });
 
-// User Login
+app.get('/api/search/:query', async (req, res) => {
+    const users = await User.find({ username: { $regex: '^' + req.params.query, $options: 'i' } }).select('username').limit(5);
+    res.json(users);
+});
+
+// 5. AUTH
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     const user = await User.findOne({ username, password });
@@ -181,25 +173,41 @@ app.post('/api/login', async (req, res) => {
     res.json({ message: "Access Granted", username: user.username });
 });
 
-// User Signup
 app.post('/api/signup', async (req, res) => {
     try {
         const { username, password, email, phone } = req.body;
-        const newUser = new User({ username, password, email, phone });
-        await newUser.save();
+        await new User({ username, password, email, phone }).save();
         res.json({ message: "Success" });
     } catch (err) { res.status(500).json({ error: "Signup failed" }); }
 });
 
 // --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
-    // Handling Chat Messages
-    socket.on('send_message', async (data) => {
-        await Message.create({ sender: data.sender, content: data.content });
-        io.emit('receive_message', data);
+    // Join a unique room named after the user
+    socket.on('join_private', (username) => {
+        socket.join(username);
+        console.log(`📡 ${username} is now online and in their private room.`);
     });
 
-    // Handling Real-time Like Notifications
+    socket.on('send_message', async (data) => {
+        try {
+            const { sender, receiver, content, type } = data;
+            const newMessage = await Message.create({ sender, receiver, content, type });
+            
+            const messageData = { 
+                ...data, 
+                _id: newMessage._id, 
+                timestamp: newMessage.timestamp 
+            };
+
+            // Only emit to the two people involved
+            io.to(receiver).emit('receive_message', messageData);
+            io.to(sender).emit('receive_message', messageData);
+        } catch (err) {
+            console.error("Socket Message Error:", err);
+        }
+    });
+
     socket.on('send_like', (data) => {
         io.emit('receive_like', data);
     });

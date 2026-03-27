@@ -14,41 +14,26 @@
         }
 
         body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            margin: 0; padding: 0; height: 100vh;
+            display: flex; justify-content: center; align-items: center;
             background: var(--primary-gradient);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             overflow: hidden;
         }
 
         .chat-container {
-            width: 95vw;
-            max-width: 450px;
-            height: 92vh;
+            width: 95vw; max-width: 450px; height: 92vh;
             background: var(--glass);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 40px;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 40px 60px rgba(0, 0, 0, 0.3);
-            position: relative;
+            border-radius: 40px; display: flex; flex-direction: column;
+            box-shadow: 0 40px 60px rgba(0, 0, 0, 0.3); position: relative;
         }
 
         .chat-header {
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: white;
-            background: rgba(0, 0, 0, 0.1);
-            border-top-left-radius: 40px;
-            border-top-right-radius: 40px;
+            padding: 20px; display: flex; justify-content: space-between;
+            align-items: center; color: white; background: rgba(0, 0, 0, 0.1);
+            border-top-left-radius: 40px; border-top-right-radius: 40px;
         }
 
         .user-info { display: flex; align-items: center; gap: 10px; font-weight: bold; }
@@ -59,31 +44,23 @@
         .call-actions i:hover { transform: scale(1.2); color: #00d2ff; }
 
         .timer-bar {
-            background: rgba(0,0,0,0.2);
-            padding: 8px;
-            font-size: 11px;
-            color: #00d2ff;
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            background: rgba(0,0,0,0.2); padding: 8px; font-size: 11px;
+            color: #00d2ff; text-align: center; text-transform: uppercase; letter-spacing: 1px;
         }
 
         .chat-messages {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+            flex: 1; padding: 20px; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 12px;
+            scrollbar-width: none;
         }
+        .chat-messages::-webkit-scrollbar { display: none; }
 
         .message {
-            max-width: 75%;
-            padding: 12px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            line-height: 1.4;
+            max-width: 75%; padding: 12px 16px; border-radius: 20px;
+            font-size: 14px; line-height: 1.4; position: relative;
+            animation: slideUp 0.3s ease;
         }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .received { background: white; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; }
         .sent { background: linear-gradient(to right, #00d2ff, #3a7bd5); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
@@ -91,91 +68,71 @@
         .sent-img { max-width: 100%; border-radius: 15px; margin-top: 5px; display: block; }
 
         .chat-input-area {
-            padding: 15px 20px 30px; 
-            background: rgba(0,0,0,0.2);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            border-bottom-left-radius: 40px;
-            border-bottom-right-radius: 40px;
+            padding: 15px 20px 30px; background: rgba(0,0,0,0.2);
+            display: flex; align-items: center; gap: 12px;
+            border-bottom-left-radius: 40px; border-bottom-right-radius: 40px;
         }
 
         .input-wrapper {
-            flex: 1;
-            background: white;
-            border-radius: 25px;
-            display: flex;
-            align-items: center;
-            padding: 5px 15px;
+            flex: 1; background: white; border-radius: 25px;
+            display: flex; align-items: center; padding: 5px 15px; position: relative;
         }
 
-        .input-wrapper input { border: none; padding: 10px; width: 100%; outline: none; font-size: 15px; }
+        .input-wrapper input { border: none; padding: 10px; width: 100%; outline: none; font-size: 15px; color: #333; }
 
         .media-btn { color: #764ba2; font-size: 1.3rem; cursor: pointer; margin-right: 10px; }
         .mic-btn { color: #555; font-size: 1.2rem; cursor: pointer; }
         
         .send-btn { 
-            background: #764ba2; 
-            border: none; color: white; width: 45px; height: 45px; border-radius: 50%; 
-            display: flex; align-items: center; justify-content: center;
+            background: #764ba2; border: none; color: white; width: 45px; height: 45px; 
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: 0.3s;
         }
+        .send-btn:active { transform: scale(0.9); }
 
-        /* CALLING OVERLAY STYLES */
+        /* CALLING OVERLAY */
         .call-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
-            backdrop-filter: blur(20px);
-            z-index: 100;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-around;
-            border-radius: 40px;
-            color: white;
-            animation: fadeIn 0.4s ease;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); backdrop-filter: blur(20px);
+            z-index: 100; display: none; flex-direction: column;
+            align-items: center; justify-content: space-around;
+            border-radius: 40px; color: white; animation: fadeIn 0.4s ease;
         }
-
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         .caller-avatar {
-            width: 120px; height: 120px;
-            border-radius: 50%;
-            border: 3px solid #00d2ff;
-            background: #333;
+            width: 120px; height: 120px; border-radius: 50%;
+            border: 3px solid #00d2ff; background: #333;
             display: flex; align-items: center; justify-content: center;
-            font-size: 50px;
-            box-shadow: 0 0 30px rgba(0,210,255,0.4);
+            font-size: 50px; box-shadow: 0 0 30px rgba(0,210,255,0.4);
             animation: pulse-border 2s infinite;
         }
-
         @keyframes pulse-border {
             0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,210,255,0.7); }
             70% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(0,210,255,0); }
             100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,210,255,0); }
         }
 
-        .call-type { font-size: 18px; letter-spacing: 2px; text-transform: uppercase; }
-        
         .end-call-btn {
-            background: #ff4b2b;
-            width: 70px; height: 70px;
-            border-radius: 50%;
+            background: #ff4b2b; width: 70px; height: 70px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             font-size: 30px; cursor: pointer;
         }
 
-        #recording-ui { display: none; flex: 1; align-items: center; gap: 10px; color: #ff4b2b; font-weight: bold; }
+        #recording-ui { 
+            display: none; position: absolute; left: 50px; 
+            align-items: center; gap: 10px; color: #ff4b2b; font-weight: bold; 
+        }
     </style>
 </head>
 <body>
 
     <div class="chat-container">
         <div class="call-overlay" id="callOverlay">
-            <div class="caller-avatar">👤</div>
-            <div>
-                <h2 id="callTarget">Private Duo</h2>
-                <p class="call-type" id="callLabel">Audio Call...</p>
+            <div class="caller-avatar" id="callAvatar">👤</div>
+            <div style="text-align: center;">
+                <h2 id="callTarget">Private User</h2>
+                <p style="letter-spacing: 2px; opacity: 0.7;" id="callLabel">Calling...</p>
             </div>
             <div class="end-call-btn" id="endCall"><i class="fas fa-phone-slash"></i></div>
         </div>
@@ -183,11 +140,11 @@
         <div class="chat-header">
             <div class="user-info">
                 <div class="status-dot"></div>
-                <span>Private Duo 🔒</span>
+                <span id="header-name">Private Duo 🔒</span>
             </div>
             <div class="call-actions">
-                <i class="fas fa-phone" id="audioBtn"></i>
-                <i class="fas fa-video" id="videoBtn"></i>
+                <i class="fas fa-phone" onclick="triggerCall('Voice')"></i>
+                <i class="fas fa-video" onclick="triggerCall('Video')"></i>
             </div>
         </div>
 
@@ -197,17 +154,19 @@
 
         <div class="chat-messages" id="chatBox">
             <div class="message received">Everything we say here disappears. 💨</div>
-            <div class="message sent">Perfect. Just the two of us! 🔒</div>
         </div>
 
         <div class="chat-input-area">
             <div class="input-wrapper">
                 <i class="fas fa-camera media-btn" id="camBtn"></i>
                 <input type="file" id="fileInput" accept="image/*" hidden>
+                
                 <input type="text" placeholder="Message..." id="msgInput">
+                
                 <div id="recording-ui">
-                    <i class="fas fa-circle"></i> Recording... <span id="timer">0:00</span>
+                    <i class="fas fa-circle"></i> Rec <span id="timer">0:00</span>
                 </div>
+                
                 <i class="fas fa-microphone mic-btn" id="micBtn"></i>
             </div>
             <button class="send-btn" id="sendBtn">
@@ -217,74 +176,106 @@
     </div>
 
     <script>
-        // --- Call Logic ---
-        const overlay = document.getElementById('callOverlay');
-        const endCall = document.getElementById('endCall');
-        const callLabel = document.getElementById('callLabel');
+        // --- 1. SETUP & URL LOGIC ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetUser = urlParams.get('user') || 'Private User';
+        const loggedInUser = localStorage.getItem('vault_username');
 
-        function triggerCall(type) {
-            overlay.style.display = 'flex';
-            callLabel.innerText = type === 'video' ? 'Video Calling...' : 'Audio Calling...';
-        }
+        document.getElementById('header-name').innerText = `${targetUser} 🔒`;
+        document.getElementById('callTarget').innerText = targetUser;
+        document.getElementById('callAvatar').innerText = targetUser.charAt(0).toUpperCase();
 
-        document.getElementById('audioBtn').addEventListener('click', () => triggerCall('audio'));
-        document.getElementById('videoBtn').addEventListener('click', () => triggerCall('video'));
-        endCall.addEventListener('click', () => overlay.style.display = 'none');
-
-        // --- Text/Image Logic ---
-        const micBtn = document.getElementById('micBtn');
-        const camBtn = document.getElementById('camBtn');
-        const fileInput = document.getElementById('fileInput');
+        // --- 2. MESSAGING LOGIC ---
         const msgInput = document.getElementById('msgInput');
         const sendBtn = document.getElementById('sendBtn');
         const chatBox = document.getElementById('chatBox');
 
-        function sendText() {
-            if (msgInput.value.trim()) {
-                const msg = document.createElement('div');
-                msg.className = 'message sent';
-                msg.innerText = msgInput.value;
-                chatBox.appendChild(msg);
-                msgInput.value = "";
-                chatBox.scrollTop = chatBox.scrollHeight;
+        function appendMessage(content, type = 'sent', isImage = false) {
+            const msg = document.createElement('div');
+            msg.className = `message ${type}`;
+            
+            if (isImage) {
+                msg.innerHTML = `<img src="${content}" class="sent-img">`;
+            } else {
+                msg.innerHTML = content;
             }
+            
+            chatBox.appendChild(msg);
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
-        sendBtn.addEventListener('click', sendText);
+
+        async function sendMessage() {
+            const text = msgInput.value.trim();
+            if (!text) return;
+
+            // UI Update
+            appendMessage(text, 'sent');
+            msgInput.value = "";
+
+            // Server Update (Template for your backend)
+            try {
+                await fetch('/api/chat/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sender: loggedInUser,
+                        receiver: targetUser,
+                        message: text
+                    })
+                });
+            } catch (err) { console.log("Offline mode: Message not saved to DB."); }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        msgInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMessage(); });
+
+        // --- 3. MEDIA & CALL LOGIC ---
+        const camBtn = document.getElementById('camBtn');
+        const fileInput = document.getElementById('fileInput');
 
         camBtn.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', function() {
             const reader = new FileReader();
-            reader.onload = (e) => {
-                const msg = document.createElement('div');
-                msg.className = 'message sent';
-                msg.innerHTML = `<img src="${e.target.result}" class="sent-img">`;
-                chatBox.appendChild(msg);
-                chatBox.scrollTop = chatBox.scrollHeight;
-            };
+            reader.onload = (e) => appendMessage(e.target.result, 'sent', true);
             reader.readAsDataURL(this.files[0]);
         });
 
-        // --- Mic Logic ---
-        let timerInterval;
-        let sec = 0;
-        function startRec() { 
-            msgInput.style.display = 'none'; camBtn.style.display = 'none'; 
-            document.getElementById('recording-ui').style.display = 'flex';
-            timerInterval = setInterval(() => { sec++; document.getElementById('timer').innerText = `0:${sec < 10 ? '0' : ''}${sec}`; }, 1000);
+        function triggerCall(type) {
+            const overlay = document.getElementById('callOverlay');
+            document.getElementById('callLabel').innerText = `${type} Calling...`;
+            overlay.style.display = 'flex';
         }
+
+        document.getElementById('endCall').addEventListener('click', () => {
+            document.getElementById('callOverlay').style.display = 'none';
+        });
+
+        // --- 4. VOICE NOTE LOGIC ---
+        let timerInterval, sec = 0;
+        const micBtn = document.getElementById('micBtn');
+        const recUI = document.getElementById('recording-ui');
+
+        function startRec() { 
+            msgInput.style.visibility = 'hidden'; 
+            recUI.style.display = 'flex';
+            sec = 0;
+            timerInterval = setInterval(() => { 
+                sec++; 
+                document.getElementById('timer').innerText = `0:${sec < 10 ? '0' : ''}${sec}`; 
+            }, 1000);
+        }
+
         function stopRec() { 
             clearInterval(timerInterval); 
-            msgInput.style.display = 'block'; camBtn.style.display = 'block'; 
-            document.getElementById('recording-ui').style.display = 'none';
-            if(sec > 0) {
-                const vn = document.createElement('div');
-                vn.className = 'message sent';
-                vn.innerHTML = `<i class="fas fa-play"></i> Voice Note (${sec}s)`;
-                chatBox.appendChild(vn);
-            }
-            sec = 0;
+            msgInput.style.visibility = 'visible'; 
+            recUI.style.display = 'none';
+            if(sec > 0) appendMessage(`<i class="fas fa-play"></i> Voice Note (${sec}s)`, 'sent');
         }
-        micBtn.addEventListener('mousedown', startRec); micBtn.addEventListener('mouseup', stopRec);
+
+        // Desktop Events
+        micBtn.addEventListener('mousedown', startRec);
+        micBtn.addEventListener('mouseup', stopRec);
+        // Mobile Events
         micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRec(); });
         micBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRec(); });
     </script>
