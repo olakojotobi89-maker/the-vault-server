@@ -59,7 +59,7 @@
         .message {
             max-width: 75%; padding: 12px 16px; border-radius: 20px;
             font-size: 14px; line-height: 1.4; position: relative;
-            animation: slideUp 0.3s ease; cursor: pointer;
+            animation: slideUp 0.3s ease;
         }
         @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -67,6 +67,14 @@
         .sent { background: linear-gradient(to right, #00d2ff, #3a7bd5); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
 
         .sent-img { max-width: 100%; border-radius: 15px; margin-top: 5px; display: block; }
+
+        /* Voice Note Styling */
+        .voice-note-ui { display: flex; align-items: center; gap: 10px; min-width: 140px; cursor: pointer; padding: 5px 0; }
+        .vn-play-btn { font-size: 1.2rem; }
+        .vn-track { flex: 1; height: 3px; background: rgba(0,0,0,0.1); border-radius: 2px; position: relative; }
+        .sent .vn-track { background: rgba(255,255,255,0.3); }
+        .vn-progress { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: #764ba2; border-radius: 2px; }
+        .sent .vn-progress { background: white; }
 
         .chat-input-area {
             padding: 15px 20px 30px; background: rgba(0,0,0,0.2);
@@ -82,14 +90,14 @@
         .input-wrapper input { border: none; padding: 10px; width: 100%; outline: none; font-size: 15px; color: #333; }
 
         .media-btn { color: #764ba2; font-size: 1.3rem; cursor: pointer; margin-right: 10px; }
-        .mic-btn { color: #555; font-size: 1.2rem; cursor: pointer; }
+        .mic-btn { color: #555; font-size: 1.2rem; cursor: pointer; transition: 0.2s; }
+        .mic-btn.active { color: #ff4b2b; transform: scale(1.3); }
         
         .send-btn { 
             background: #764ba2; border: none; color: white; width: 45px; height: 45px; 
             border-radius: 50%; display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: 0.3s;
         }
-        .send-btn:active { transform: scale(0.9); }
 
         .call-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -98,30 +106,11 @@
             align-items: center; justify-content: space-around;
             border-radius: 40px; color: white; animation: fadeIn 0.4s ease;
         }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .caller-avatar {
-            width: 120px; height: 120px; border-radius: 50%;
-            border: 3px solid #00d2ff; background: #333;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 50px; box-shadow: 0 0 30px rgba(0,210,255,0.4);
-            animation: pulse-border 2s infinite;
-        }
-        @keyframes pulse-border {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,210,255,0.7); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(0,210,255,0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,210,255,0); }
-        }
-
-        .end-call-btn {
-            background: #ff4b2b; width: 70px; height: 70px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 30px; cursor: pointer;
-        }
 
         #recording-ui { 
             display: none; position: absolute; left: 50px; 
             align-items: center; gap: 10px; color: #ff4b2b; font-weight: bold; 
+            background: white; width: calc(100% - 100px);
         }
     </style>
 </head>
@@ -134,7 +123,9 @@
                 <h2 id="callTarget">Private User</h2>
                 <p style="letter-spacing: 2px; opacity: 0.7;" id="callLabel">Calling...</p>
             </div>
-            <div class="end-call-btn" id="endCall"><i class="fas fa-phone-slash"></i></div>
+            <div class="end-call-btn" id="endCall" style="background: #ff4b2b; width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; cursor: pointer;">
+                <i class="fas fa-phone-slash"></i>
+            </div>
         </div>
 
         <div class="chat-header">
@@ -160,7 +151,7 @@
                 <input type="file" id="fileInput" accept="image/*" hidden>
                 <input type="text" placeholder="Message..." id="msgInput">
                 <div id="recording-ui">
-                    <i class="fas fa-circle"></i> Rec <span id="timer">0:00</span>
+                    <i class="fas fa-circle" style="animation: pulse 1s infinite;"></i> Rec <span id="timer">0:00</span>
                 </div>
                 <i class="fas fa-microphone mic-btn" id="micBtn"></i>
             </div>
@@ -176,53 +167,135 @@
         const targetUser = urlParams.get('user') || 'Private User';
         const loggedInUser = localStorage.getItem('vault_username');
         const chatBox = document.getElementById('chatBox');
+        const msgInput = document.getElementById('msgInput');
+        const micBtn = document.getElementById('micBtn');
+        const recUI = document.getElementById('recording-ui');
 
-        // Initial UI Setup
         document.getElementById('header-name').innerText = `${targetUser} 🔒`;
         document.getElementById('callTarget').innerText = targetUser;
         document.getElementById('callAvatar').innerText = targetUser.charAt(0).toUpperCase();
 
-        // Join private socket room
         socket.emit('join_private', loggedInUser);
 
-        // --- 1. PERSISTENT HISTORY LOADER ---
         async function loadHistory() {
             try {
                 const res = await fetch(`/api/chat/${loggedInUser}/${targetUser}`);
                 const history = await res.json();
-                chatBox.innerHTML = ""; // Clear loader
+                chatBox.innerHTML = "";
                 history.forEach(msg => {
-                    appendMessage(msg.content, msg.sender === loggedInUser ? 'sent' : 'received', msg.type === 'image', msg._id);
+                    appendMessage(msg.content, msg.sender === loggedInUser ? 'sent' : 'received', msg.type, msg._id);
                 });
             } catch (err) { console.error("History error:", err); }
         }
 
-        // --- 2. MESSAGING LOGIC ---
-        function appendMessage(content, type = 'sent', isImage = false, id = null) {
+        function appendMessage(content, type = 'sent', msgType = 'text', id = null) {
             const msg = document.createElement('div');
             msg.className = `message ${type}`;
             if (id) msg.setAttribute('data-id', id);
             
-            if (isImage) {
+            if (msgType === 'image') {
                 msg.innerHTML = `<img src="${content}" class="sent-img">`;
+            } else if (msgType === 'voice') {
+                msg.innerHTML = `
+                    <div class="voice-note-ui" onclick="playVoice(this, '${content}')">
+                        <i class="fas fa-play vn-play-btn"></i>
+                        <div class="vn-track"><div class="vn-progress"></div></div>
+                    </div>
+                `;
             } else {
                 msg.innerText = content;
             }
             
-            // Delete Feature (Hold to delete)
+            // Delete Logic
             if (type === 'sent') {
                 let pressTimer;
                 const start = () => pressTimer = setTimeout(() => deleteMessage(id, msg), 800);
                 const cancel = () => clearTimeout(pressTimer);
-                
-                msg.addEventListener('mousedown', start);
-                msg.addEventListener('mouseup', cancel);
-                msg.addEventListener('touchstart', start);
-                msg.addEventListener('touchend', cancel);
+                msg.addEventListener('mousedown', start); msg.addEventListener('mouseup', cancel);
+                msg.addEventListener('touchstart', start); msg.addEventListener('touchend', cancel);
             }
 
             chatBox.appendChild(msg);
             chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function playVoice(el, base64) {
+            const audio = new Audio(base64);
+            const playBtn = el.querySelector('.vn-play-btn');
+            const progress = el.querySelector('.vn-progress');
+
+            playBtn.className = 'fas fa-pause vn-play-btn';
+            audio.play();
+
+            audio.ontimeupdate = () => {
+                const pct = (audio.currentTime / audio.duration) * 100;
+                progress.style.width = pct + '%';
+            };
+
+            audio.onended = () => {
+                playBtn.className = 'fas fa-play vn-play-btn';
+                progress.style.width = '0%';
+            };
+        }
+
+        // --- VOICE RECORDING LOGIC ---
+        let mediaRecorder;
+        let audioChunks = [];
+        let timerInterval, sec = 0;
+
+        async function startRec() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    reader.onloadend = () => {
+                        socket.emit('send_message', { 
+                            sender: loggedInUser, receiver: targetUser, 
+                            content: reader.result, type: 'voice' 
+                        });
+                    };
+                    stream.getTracks().forEach(t => t.stop());
+                };
+
+                mediaRecorder.start();
+                sec = 0;
+                msgInput.style.visibility = 'hidden';
+                recUI.style.display = 'flex';
+                micBtn.classList.add('active');
+                timerInterval = setInterval(() => {
+                    sec++;
+                    document.getElementById('timer').innerText = `0:${sec < 10 ? '0' : ''}${sec}`;
+                }, 1000);
+            } catch (err) { alert("Mic permission denied"); }
+        }
+
+        function stopRec() {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+                clearInterval(timerInterval);
+                msgInput.style.visibility = 'visible';
+                recUI.style.display = 'none';
+                micBtn.classList.remove('active');
+            }
+        }
+
+        // Mouse/Touch Events for Hold-to-Record
+        micBtn.onmousedown = startRec; micBtn.onmouseup = stopRec;
+        micBtn.ontouchstart = (e) => { e.preventDefault(); startRec(); }; 
+        micBtn.ontouchend = (e) => { e.preventDefault(); stopRec(); };
+
+        // --- STANDARD MESSAGING ---
+        function sendMessage() {
+            const text = msgInput.value.trim();
+            if (!text) return;
+            socket.emit('send_message', { sender: loggedInUser, receiver: targetUser, content: text, type: 'text' });
+            msgInput.value = "";
         }
 
         async function deleteMessage(id, el) {
@@ -237,73 +310,30 @@
             } catch (err) { alert("Delete failed"); }
         }
 
-        function sendMessage() {
-            const text = msgInput.value.trim();
-            if (!text) return;
-            socket.emit('send_message', { 
-                sender: loggedInUser, 
-                receiver: targetUser, 
-                content: text, 
-                type: 'text' 
-            });
-            msgInput.value = "";
-        }
-
         socket.on('receive_message', (data) => {
             if ((data.sender === targetUser && data.receiver === loggedInUser) || 
                 (data.sender === loggedInUser && data.receiver === targetUser)) {
-                appendMessage(data.content, data.sender === loggedInUser ? 'sent' : 'received', data.type === 'image', data._id);
+                appendMessage(data.content, data.sender === loggedInUser ? 'sent' : 'received', data.type, data._id);
             }
         });
 
-        sendBtn.addEventListener('click', sendMessage);
-        msgInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMessage(); });
+        document.getElementById('sendBtn').onclick = sendMessage;
+        msgInput.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
 
-        // --- 3. MEDIA HANDLERS ---
         const fileInput = document.getElementById('fileInput');
         document.getElementById('camBtn').onclick = () => fileInput.click();
-        
         fileInput.onchange = function() {
             const reader = new FileReader();
-            reader.onload = () => {
-                socket.emit('send_message', { 
-                    sender: loggedInUser, 
-                    receiver: targetUser, 
-                    content: reader.result, 
-                    type: 'image' 
-                });
-            };
+            reader.onload = () => socket.emit('send_message', { sender: loggedInUser, receiver: targetUser, content: reader.result, type: 'image' });
             reader.readAsDataURL(this.files[0]);
         };
 
-        // --- 4. CALL & VOICE LOGIC ---
         function triggerCall(type) {
             document.getElementById('callLabel').innerText = `${type} Calling...`;
             document.getElementById('callOverlay').style.display = 'flex';
         }
         document.getElementById('endCall').onclick = () => document.getElementById('callOverlay').style.display = 'none';
 
-        let timerInterval, sec = 0;
-        const micBtn = document.getElementById('micBtn');
-        const recUI = document.getElementById('recording-ui');
-
-        function startRec() { 
-            msgInput.style.visibility = 'hidden'; 
-            recUI.style.display = 'flex';
-            sec = 0;
-            timerInterval = setInterval(() => { sec++; document.getElementById('timer').innerText = `0:${sec < 10 ? '0' : ''}${sec}`; }, 1000);
-        }
-        function stopRec() { 
-            clearInterval(timerInterval); 
-            msgInput.style.visibility = 'visible'; 
-            recUI.style.display = 'none';
-            if(sec > 0) socket.emit('send_message', { sender: loggedInUser, receiver: targetUser, content: `<i class="fas fa-play"></i> Voice Note (${sec}s)`, type: 'text' });
-        }
-
-        micBtn.onmousedown = startRec; micBtn.onmouseup = stopRec;
-        micBtn.ontouchstart = (e) => { e.preventDefault(); startRec(); }; micBtn.ontouchend = (e) => { e.preventDefault(); stopRec(); };
-
-        // Load History on Start
         loadHistory();
     </script>
 </body>
