@@ -29,7 +29,6 @@ mongoose.connect(MONGO_URI)
 
 // --- DATABASE SCHEMAS ---
 
-// UPDATED: Added followers, following, and bio to User
 const User = mongoose.model('User', new mongoose.Schema({
     username: { type: String, unique: true, required: true },
     password: { type: String, required: true },
@@ -43,8 +42,8 @@ const User = mongoose.model('User', new mongoose.Schema({
 const Post = mongoose.model('Post', new mongoose.Schema({
     sender: String,
     caption: String,
-    media: String,
-    type: String,
+    media: String, // Base64 string or URL
+    type: String,  // 'image' or 'video'
     timestamp: { type: Date, default: Date.now }
 }));
 
@@ -56,13 +55,45 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// NEW: Get Profile Data (Followers, Following, Bio)
+// NEW: Search for Users
+app.get('/api/search/:query', async (req, res) => {
+    try {
+        const query = req.params.query;
+        // Finds users starting with the query (case-insensitive)
+        const users = await User.find({ 
+            username: { $regex: '^' + query, $options: 'i' } 
+        }).select('username').limit(5);
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ error: "Search failed" });
+    }
+});
+
+// NEW: Save a New Post to Database
+app.post('/api/posts', async (req, res) => {
+    try {
+        const { sender, caption, media, type } = req.body;
+        const newPost = new Post({ sender, caption, media, type });
+        await newPost.save();
+        res.json({ success: true, post: newPost });
+    } catch (err) {
+        res.status(500).json({ error: "Could not save post" });
+    }
+});
+
+// NEW: Get All Posts for Feed
+app.get('/api/posts', async (req, res) => {
+    try {
+        const posts = await Post.find().sort({ timestamp: -1 }).limit(20);
+        res.json(posts);
+    } catch (err) {
+        res.status(500).json({ error: "Could not fetch feed" });
+    }
+});
+
 app.get('/api/profile/:username', async (req, res) => {
     try {
-        const user = await User.findOne({ username: req.params.username })
-            .populate('followers', 'username')
-            .populate('following', 'username');
-        
+        const user = await User.findOne({ username: req.params.username });
         if (!user) return res.status(404).json({ error: "User not found" });
 
         const userPosts = await Post.find({ sender: req.params.username }).sort({ timestamp: -1 });
@@ -73,15 +104,13 @@ app.get('/api/profile/:username', async (req, res) => {
             followersCount: user.followers.length,
             followingCount: user.following.length,
             posts: userPosts,
-            // Check if a specific user is already following this profile
-            followersList: user.followers.map(f => f.username) 
+            followersList: user.followers // For checking follow status
         });
     } catch (err) {
         res.status(500).json({ error: "Server error fetching profile" });
     }
 });
 
-// NEW: Follow/Unfollow Logic
 app.post('/api/follow', async (req, res) => {
     const { myUsername, targetUsername } = req.body;
     if (myUsername === targetUsername) return res.status(400).json({ error: "You cannot follow yourself" });
@@ -95,11 +124,9 @@ app.post('/api/follow', async (req, res) => {
         const isFollowing = me.following.includes(target._id);
 
         if (isFollowing) {
-            // Unfollow
             me.following.pull(target._id);
             target.followers.pull(me._id);
         } else {
-            // Follow
             me.following.push(target._id);
             target.followers.push(me._id);
         }
