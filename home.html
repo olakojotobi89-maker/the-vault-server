@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BBNT | Home</title>
+
+    <script>
+        // SECURITY GUARD: If not logged in, kick them back to index.html
+        if (!localStorage.getItem('vault_username')) {
+            window.location.href = 'index.html';
+        }
+
+        // LOGOUT FUNCTION
+        function logoutVault() {
+            localStorage.removeItem('vault_username');
+            window.location.href = 'index.html';
+        }
+    </script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%);
+        }
+        body {
+            margin: 0;
+            padding: 20px 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            background: var(--primary-gradient);
+            font-family: -apple-system, sans-serif;
+            color: white;
+        }
+        .home-container {
+            width: 95%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 30px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+        }
+        /* Navigation Section */
+        .nav-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .nav-item {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 15px;
+            border-radius: 20px;
+            text-decoration: none;
+            color: white;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+        .chat-link {
+            grid-column: span 2;
+            background: linear-gradient(to right, #00d2ff, #3a7bd5);
+        }
+
+        /* Post Input Section */
+        .post-input-box {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: white;
+            outline: none;
+            resize: none;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        .media-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding-top: 10px;
+        }
+        .upload-label {
+            cursor: pointer;
+            font-size: 20px;
+            color: #00d2ff;
+        }
+        .post-btn {
+            background: #fdbb2d;
+            border: none;
+            padding: 8px 25px;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* Post Cards */
+        #feed-display { display: flex; flex-direction: column; gap: 15px; }
+        .post {
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 20px;
+            padding: 15px;
+            overflow: hidden;
+        }
+        .post-user { font-weight: bold; color: #00d2ff; margin-bottom: 8px; }
+        .post-caption { margin-bottom: 10px; line-height: 1.4; }
+        .post-media {
+            width: 100%;
+            border-radius: 15px;
+            margin-bottom: 10px;
+            max-height: 400px;
+            object-fit: cover;
+        }
+        .post-actions {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="home-container">
+        <div class="glass-card">
+            <h1 style="margin: 0; text-align: center;">BBNT</h1>
+            <p style="text-align: center; margin: 5px 0 0; font-size: 14px; opacity: 0.8;">
+                Welcome back, <span id="user-greeting" style="color: #fdbb2d; font-weight: bold;">User</span>
+            </p>
+
+            <div class="nav-grid">
+                <a href="chat.html" class="nav-item chat-link"><i class="fas fa-comments"></i> <span>Open Private Chat</span></a>
+                <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i> <span>Settings</span></a>
+                <div onclick="logoutVault()" class="nav-item"><i class="fas fa-lock"></i> <span>Lock Vault</span></div>
+            </div>
+        </div>
+
+        <div class="glass-card">
+            <div style="font-weight: bold; margin-bottom: 15px;"><i class="fas fa-rss"></i> Feed</div>
+            
+            <div class="post-input-box">
+                <textarea id="post-caption" placeholder="Write a caption..." rows="2"></textarea>
+                <div class="media-controls">
+                    <label class="upload-label">
+                        <i class="fas fa-camera"></i>
+                        <input type="file" id="media-upload" accept="image/*,video/*" style="display: none;">
+                    </label>
+                    <span id="file-name" style="font-size: 10px; opacity: 0.6;">No file selected</span>
+                    <button class="post-btn" onclick="createPost()">Post</button>
+                </div>
+            </div>
+
+            <div id="feed-display"></div>
+        </div>
+    </div>
+
+    <script>
+        // Set the greeting name from localStorage
+        const myName = localStorage.getItem('vault_username') || 'Guest';
+        document.getElementById('user-greeting').innerText = myName;
+
+        const fileInput = document.getElementById('media-upload');
+        const fileNameLabel = document.getElementById('file-name');
+
+        fileInput.onchange = () => {
+            if (fileInput.files.length > 0) {
+                fileNameLabel.innerText = fileInput.files[0].name;
+            }
+        };
+
+        function createPost() {
+            const caption = document.getElementById('post-caption').value;
+            const file = fileInput.files[0];
+            const feed = document.getElementById('feed-display');
+
+            if (!caption && !file) return;
+
+            const postDiv = document.createElement('div');
+            postDiv.className = 'post';
+
+            let mediaHTML = '';
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const src = e.target.result;
+                    if (file.type.startsWith('image/')) {
+                        mediaHTML = `<img src="${src}" class="post-media">`;
+                    } else if (file.type.startsWith('video/')) {
+                        mediaHTML = `<video src="${src}" class="post-media" controls></video>`;
+                    }
+                    finishPost(postDiv, caption, mediaHTML);
+                };
+                reader.readAsDataURL(file);
+            } else {
+                finishPost(postDiv, caption, '');
+            }
+        }
+
+        function finishPost(container, caption, media) {
+            container.innerHTML = `
+                <div class="post-user">${myName}</div>
+                ${media}
+                <div class="post-caption">${caption}</div>
+                <div class="post-actions">
+                    <span onclick="handleLike(this)" style="cursor:pointer;"><i class="far fa-heart"></i> <span class="like-count">0</span> Likes</span>
+                    <span onclick="toggleComments(this)" style="cursor:pointer;"><i class="far fa-comment"></i> Comment</span>
+                </div>
+                <div class="comment-section" style="display:none; margin-top:10px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+                    <div class="comment-list" style="font-size:12px; margin-bottom:10px;"></div>
+                    <div style="display:flex; gap:5px;">
+                        <input type="text" class="comm-input" placeholder="Add a comment..." 
+                               style="flex:1; background:rgba(255,255,255,0.1); border:none; color:white; padding:8px; border-radius:10px; outline:none;">
+                        <button onclick="addComment(this)" style="background:#00d2ff; border:none; border-radius:10px; color:white; padding:0 15px; cursor:pointer;">Send</button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('feed-display').prepend(container);
+            
+            document.getElementById('post-caption').value = '';
+            fileInput.value = '';
+            fileNameLabel.innerText = 'No file selected';
+        }
+
+        function handleLike(btn) {
+            const icon = btn.querySelector('i');
+            const countSpan = btn.querySelector('.like-count');
+            let count = parseInt(countSpan.innerText);
+
+            if (icon.classList.contains('far')) {
+                icon.classList.replace('far', 'fas');
+                icon.style.color = "#ff4b2b";
+                countSpan.innerText = count + 1;
+            } else {
+                icon.classList.replace('fas', 'far');
+                icon.style.color = "white";
+                countSpan.innerText = count - 1;
+            }
+        }
+
+        function toggleComments(btn) {
+            const post = btn.closest('.post');
+            const section = post.querySelector('.comment-section');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function addComment(btn) {
+            const section = btn.closest('.comment-section');
+            const input = section.querySelector('.comm-input');
+            const list = section.querySelector('.comment-list');
+            if (input.value.trim() !== "") {
+                const newComm = document.createElement('div');
+                newComm.style.marginBottom = "5px";
+                newComm.innerHTML = `<b style="color:#00d2ff;">${myName}:</b> ${input.value}`;
+                list.appendChild(newComm);
+                input.value = '';
+            }
+        }
+    </script>
+</body>
+</html>
