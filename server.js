@@ -44,7 +44,13 @@ const Post = mongoose.model('Post', new mongoose.Schema({
     caption: String,
     media: String, 
     type: String,  
-    timestamp: { type: Date, default: Date.now }
+    timestamp: { type: Date, default: Date.now },
+    // NEW: Added comments array to the Schema
+    comments: [{
+        user: String,
+        text: String,
+        timestamp: { type: Date, default: Date.now }
+    }]
 }));
 
 const Message = mongoose.model('Message', new mongoose.Schema({
@@ -55,17 +61,33 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// NEW: Delete Post Route
+// NEW: Add Comment Route
+app.post('/api/posts/:postId/comment', async (req, res) => {
+    try {
+        const { user, text } = req.body;
+        const post = await Post.findById(req.params.postId);
+        
+        if (!post) return res.status(404).json({ error: "Post not found" });
+
+        post.comments.push({ user, text });
+        await post.save();
+        
+        res.json({ success: true, comments: post.comments });
+    } catch (err) {
+        res.status(500).json({ error: "Could not add comment" });
+    }
+});
+
+// Delete Post Route
 app.delete('/api/posts/:postId', async (req, res) => {
     try {
-        const { username } = req.body; // Sender's name passed from frontend
+        const { username } = req.body; 
         const post = await Post.findById(req.params.postId);
 
         if (!post) return res.status(404).json({ error: "Post not found" });
 
-        // Security Check: Only the owner can delete
         if (post.sender !== username) {
-            return res.status(403).json({ error: "Unauthorized: You can only delete your own posts" });
+            return res.status(403).json({ error: "Unauthorized" });
         }
 
         await Post.findByIdAndDelete(req.params.postId);
@@ -100,7 +122,7 @@ app.post('/api/posts', async (req, res) => {
     }
 });
 
-// Get Feed (Now returns _id)
+// Get Feed
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(20);
