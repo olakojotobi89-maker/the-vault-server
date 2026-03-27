@@ -12,6 +12,7 @@
             display: flex; justify-content: center;
             background: var(--primary-gradient);
             font-family: -apple-system, sans-serif; color: white;
+            overflow-x: hidden;
         }
         .profile-container { width: 95%; max-width: 500px; display: flex; flex-direction: column; gap: 20px; }
         .glass-card {
@@ -31,6 +32,9 @@
             text-align: center; margin: 20px 0; border-top: 1px solid rgba(255,255,255,0.1);
             padding-top: 15px;
         }
+        /* Make stats clickable */
+        .stat-box { cursor: pointer; transition: 0.3s; border-radius: 15px; padding: 5px; }
+        .stat-box:hover { background: rgba(255,255,255,0.1); }
         .stat-val { font-weight: bold; font-size: 18px; display: block; }
         .stat-label { font-size: 12px; opacity: 0.7; }
         
@@ -42,9 +46,22 @@
         }
         .follow-btn.following { background: rgba(255,255,255,0.2); border: 1px solid white; box-shadow: none; }
         
-        .post-grid {
-            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px;
+        /* FRIENDS LIST MODAL */
+        #listModal { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); z-index: 1000; 
+            justify-content: center; align-items: center; 
         }
+        .modal-content { 
+            background: white; color: #333; width: 85%; max-width: 380px; 
+            border-radius: 25px; padding: 20px; max-height: 60vh; overflow-y: auto; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .user-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f5f5f5; }
+        .chat-btn { background: #1a2a6c; color: white; text-decoration: none; padding: 6px 15px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+
+        .post-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
         .grid-item {
             aspect-ratio: 1/1; background: rgba(0,0,0,0.3);
             border-radius: 12px; overflow: hidden;
@@ -52,10 +69,7 @@
             border: 1px solid rgba(255,255,255,0.1);
         }
         .grid-item img, .grid-item video { width: 100%; height: 100%; object-fit: cover; }
-        .back-btn {
-            text-decoration: none; color: white; font-size: 14px;
-            display: inline-block; margin-bottom: 15px; opacity: 0.8;
-        }
+        .back-btn { text-decoration: none; color: white; font-size: 14px; display: inline-block; margin-bottom: 15px; opacity: 0.8; }
         .back-btn:hover { opacity: 1; }
     </style>
 </head>
@@ -71,9 +85,13 @@
             </div>
 
             <div class="stats-grid">
-                <div><span class="stat-val" id="count-posts">0</span><span class="stat-label">Posts</span></div>
-                <div><span class="stat-val" id="count-followers">0</span><span class="stat-label">Followers</span></div>
-                <div><span class="stat-val" id="count-following">0</span><span class="stat-label">Following</span></div>
+                <div class="stat-box"><span class="stat-val" id="count-posts">0</span><span class="stat-label">Posts</span></div>
+                <div class="stat-box" onclick="openFriendsList('followers')">
+                    <span class="stat-val" id="count-followers">0</span><span class="stat-label">Followers</span>
+                </div>
+                <div class="stat-box" onclick="openFriendsList('following')">
+                    <span class="stat-val" id="count-following">0</span><span class="stat-label">Following</span>
+                </div>
             </div>
 
             <button id="action-btn" class="follow-btn" onclick="toggleFollow()">Loading...</button>
@@ -81,8 +99,17 @@
 
         <div class="glass-card">
             <div style="font-weight: bold; margin-bottom: 10px;"><i class="fas fa-th"></i> Posts</div>
-            <div id="user-posts" class="post-grid">
-                </div>
+            <div id="user-posts" class="post-grid"></div>
+        </div>
+    </div>
+
+    <div id="listModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle" style="margin:0">Users</h3>
+                <i class="fas fa-times" onclick="closeModal()" style="cursor:pointer"></i>
+            </div>
+            <div id="userList"></div>
         </div>
     </div>
 
@@ -91,106 +118,102 @@
         const targetUser = urlParams.get('user');
         const loggedInUser = localStorage.getItem('vault_username');
         const actionBtn = document.getElementById('action-btn');
+        let currentProfileData = null;
 
         async function loadProfile() {
             if (!targetUser) return window.location.href = 'home.html';
 
             try {
-                // We fetch both profile data and logged-in user data to check follow status
                 const response = await fetch(`/api/profile/${targetUser}`);
-                const data = await response.json();
+                currentProfileData = await response.json();
 
-                if (data.error) {
+                if (currentProfileData.error) {
                     alert("User not found");
                     window.location.href = 'home.html';
                     return;
                 }
 
-                // Update Profile UI
-                document.getElementById('profile-name').innerText = data.username;
-                document.getElementById('pfp').innerText = data.username.charAt(0).toUpperCase();
-                document.getElementById('profile-bio').innerText = data.bio || "No bio yet.";
-                document.getElementById('count-posts').innerText = data.posts.length;
-                document.getElementById('count-followers').innerText = data.followersCount;
-                document.getElementById('count-following').innerText = data.followingCount;
+                document.getElementById('profile-name').innerText = currentProfileData.username;
+                document.getElementById('pfp').innerText = currentProfileData.username.charAt(0).toUpperCase();
+                document.getElementById('profile-bio').innerText = currentProfileData.bio || "No bio yet.";
+                document.getElementById('count-posts').innerText = currentProfileData.posts.length;
+                document.getElementById('count-followers').innerText = currentProfileData.followersCount;
+                document.getElementById('count-following').innerText = currentProfileData.followingCount;
 
-                // Load Post Grid
                 const postGrid = document.getElementById('user-posts');
-                postGrid.innerHTML = ''; 
-                
-                if (data.posts.length === 0) {
-                    postGrid.innerHTML = '<p style="grid-column: span 3; text-align:center; opacity:0.5; font-size:12px; padding:20px;">No posts yet.</p>';
-                }
+                postGrid.innerHTML = currentProfileData.posts.length === 0 ? 
+                    '<p style="grid-column: span 3; text-align:center; opacity:0.5; font-size:12px; padding:20px;">No posts yet.</p>' : '';
 
-                data.posts.forEach(post => {
+                currentProfileData.posts.forEach(post => {
                     const item = document.createElement('div');
                     item.className = 'grid-item';
-                    
                     if (post.media) {
-                        if (post.type === 'video') {
-                            item.innerHTML = `<video src="${post.media}"></video>`;
-                        } else {
-                            item.innerHTML = `<img src="${post.media}">`;
-                        }
+                        item.innerHTML = post.type === 'video' ? `<video src="${post.media}"></video>` : `<img src="${post.media}">`;
                     } else {
-                        item.style.padding = '10px';
-                        item.style.fontSize = '10px';
-                        item.style.textAlign = 'center';
-                        item.innerText = post.caption.substring(0, 30) + "...";
+                        item.innerHTML = `<div style="font-size:10px; padding:10px; text-align:center;">${post.caption.substring(0, 30)}...</div>`;
                     }
                     postGrid.appendChild(item);
                 });
 
-                // Update Action Button
                 if (targetUser === loggedInUser) {
                     actionBtn.innerText = "Edit Profile";
                     actionBtn.style.background = "rgba(255,255,255,0.1)";
                     actionBtn.style.boxShadow = "none";
                 } else {
-                    // Fetch my own profile to see if I am following targetUser
                     const meRes = await fetch(`/api/profile/${loggedInUser}`);
                     const meData = await meRes.json();
-                    
-                    // Note: This logic assumes your backend returns the user object 
-                    // or we check the follower count logic. For now, we set based on 
-                    // common state.
-                    actionBtn.innerText = "Follow";
+                    const isFollowing = meData.following.some(u => u.username === targetUser);
+                    actionBtn.innerText = isFollowing ? "Following" : "Follow";
+                    actionBtn.classList.toggle('following', isFollowing);
                 }
-
-            } catch (err) {
-                console.error("Failed to load profile", err);
-            }
+            } catch (err) { console.error(err); }
         }
 
-        async function toggleFollow() {
-            if (targetUser === loggedInUser) {
-                alert("Profile editing is coming in the next update!");
+        async function openFriendsList(type) {
+            const modal = document.getElementById('listModal');
+            const listDiv = document.getElementById('userList');
+            document.getElementById('modalTitle').innerText = type.charAt(0).toUpperCase() + type.slice(1);
+            
+            modal.style.display = 'flex';
+            listDiv.innerHTML = "<p style='text-align:center'>Loading list...</p>";
+
+            // Note: Ensure your server.js populates usernames in the profile route
+            const friends = type === 'followers' ? currentProfileData.followers : currentProfileData.following;
+
+            if (!friends || friends.length === 0) {
+                listDiv.innerHTML = "<p style='text-align:center; opacity:0.5; padding:20px;'>No " + type + " found.</p>";
                 return;
             }
+
+            listDiv.innerHTML = friends.map(f => `
+                <div class="user-row">
+                    <span style="font-weight:bold">${f.username}</span>
+                    <a href="chat.html?user=${f.username}" class="chat-btn">Message</a>
+                </div>
+            `).join('');
+        }
+
+        function closeModal() { document.getElementById('listModal').style.display = 'none'; }
+
+        async function toggleFollow() {
+            if (targetUser === loggedInUser) return alert("Profile editing feature is coming!");
             
             actionBtn.disabled = true;
             try {
                 const response = await fetch('/api/follow', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        myUsername: loggedInUser, 
-                        targetUsername: targetUser 
-                    })
+                    body: JSON.stringify({ myUsername: loggedInUser, targetUsername: targetUser })
                 });
-
                 const result = await response.json();
-                
                 if (result.success) {
                     actionBtn.innerText = result.isFollowingNow ? "Following" : "Follow";
                     actionBtn.classList.toggle('following', result.isFollowingNow);
                     document.getElementById('count-followers').innerText = result.followerCount;
+                    loadProfile(); // Refresh list data
                 }
-            } catch (err) {
-                alert("Connection error.");
-            } finally {
-                actionBtn.disabled = false;
-            }
+            } catch (err) { alert("Error connecting to server."); }
+            finally { actionBtn.disabled = false; }
         }
 
         loadProfile();
