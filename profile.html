@@ -46,8 +46,9 @@
         .grid-item {
             aspect-ratio: 1/1; background: rgba(0,0,0,0.2);
             border-radius: 5px; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
         }
-        .grid-item img { width: 100%; height: 100%; object-fit: cover; }
+        .grid-item img, .grid-item video { width: 100%; height: 100%; object-fit: cover; }
         .back-btn {
             text-decoration: none; color: white; font-size: 14px;
             display: inline-block; margin-bottom: 15px;
@@ -61,8 +62,8 @@
         <div class="glass-card">
             <div class="profile-header">
                 <div id="pfp" class="big-avatar">?</div>
-                <h2 id="profile-name" style="margin: 5px 0;">Username</h2>
-                <p id="profile-bio" style="font-size: 14px; opacity: 0.8;">No bio yet.</p>
+                <h2 id="profile-name" style="margin: 5px 0;">Loading...</h2>
+                <p id="profile-bio" style="font-size: 14px; opacity: 0.8;">Fetching bio...</p>
             </div>
 
             <div class="stats-grid">
@@ -85,34 +86,95 @@
         const urlParams = new URLSearchParams(window.location.search);
         const targetUser = urlParams.get('user');
         const loggedInUser = localStorage.getItem('vault_username');
-
-        // Setup Page
-        document.getElementById('profile-name').innerText = targetUser;
-        document.getElementById('pfp').innerText = targetUser.charAt(0).toUpperCase();
-
-        // Check if it's MY profile
         const actionBtn = document.getElementById('action-btn');
-        if (targetUser === loggedInUser) {
-            actionBtn.innerText = "Edit Profile";
-            actionBtn.style.background = "rgba(255,255,255,0.1)";
+
+        // 1. Fetch Profile Data from Server
+        async function loadProfile() {
+            if (!targetUser) return window.location.href = 'home.html';
+
+            try {
+                const response = await fetch(`/api/profile/${targetUser}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    alert("User not found");
+                    window.location.href = 'home.html';
+                    return;
+                }
+
+                // Update UI
+                document.getElementById('profile-name').innerText = data.username;
+                document.getElementById('pfp').innerText = data.username.charAt(0).toUpperCase();
+                document.getElementById('profile-bio').innerText = data.bio;
+                document.getElementById('count-posts').innerText = data.posts.length;
+                document.getElementById('count-followers').innerText = data.followersCount;
+                document.getElementById('count-following').innerText = data.followingCount;
+
+                // Load the grid of posts
+                const postGrid = document.getElementById('user-posts');
+                postGrid.innerHTML = ''; 
+                data.posts.forEach(post => {
+                    const item = document.createElement('div');
+                    item.className = 'grid-item';
+                    if (post.media) {
+                        if (post.media.includes('video')) {
+                            item.innerHTML = `<video src="${post.media}"></video>`;
+                        } else {
+                            item.innerHTML = `<img src="${post.media}">`;
+                        }
+                    } else {
+                        item.style.fontSize = '10px';
+                        item.style.padding = '5px';
+                        item.innerText = post.caption.substring(0, 20) + "...";
+                    }
+                    postGrid.appendChild(item);
+                });
+
+                // Check Follow Status
+                if (targetUser === loggedInUser) {
+                    actionBtn.innerText = "Edit Profile";
+                    actionBtn.style.background = "rgba(255,255,255,0.1)";
+                } else {
+                    if (data.followersList.includes(loggedInUser)) {
+                        actionBtn.innerText = "Following";
+                        actionBtn.classList.add('following');
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load profile", err);
+            }
         }
 
-        function toggleFollow() {
+        // 2. Handle Follow/Unfollow Click
+        async function toggleFollow() {
             if (targetUser === loggedInUser) {
-                alert("Editing profile coming soon!");
+                alert("Edit Profile features (Bio, PFP) coming soon!");
                 return;
             }
             
-            if (actionBtn.classList.contains('following')) {
-                actionBtn.classList.remove('following');
-                actionBtn.innerText = "Follow";
-                // Logic to decrease follower count would go here
-            } else {
-                actionBtn.classList.add('following');
-                actionBtn.innerText = "Following";
-                // Logic to increase follower count would go here
+            try {
+                const response = await fetch('/api/follow', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        myUsername: loggedInUser, 
+                        targetUsername: targetUser 
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    actionBtn.innerText = result.isFollowingNow ? "Following" : "Follow";
+                    actionBtn.classList.toggle('following', result.isFollowingNow);
+                    document.getElementById('count-followers').innerText = result.followerCount;
+                }
+            } catch (err) {
+                alert("Connection failed. Try again.");
             }
         }
+
+        loadProfile();
     </script>
 </body>
 </html>
