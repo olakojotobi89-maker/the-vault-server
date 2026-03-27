@@ -65,13 +65,15 @@
         .post-btn { background: #fdbb2d; border: none; padding: 8px 25px; border-radius: 12px; font-weight: bold; cursor: pointer; }
 
         #feed-display { display: flex; flex-direction: column; gap: 15px; }
-        .post { background: rgba(0, 0, 0, 0.25); border-radius: 20px; padding: 15px; }
-        .post-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .post { background: rgba(0, 0, 0, 0.25); border-radius: 20px; padding: 15px; transition: opacity 0.3s ease; }
+        .post-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
         .post-user-link { text-decoration: none; color: #00d2ff; font-weight: bold; display: flex; align-items: center; gap: 8px; }
         .mini-avatar { width: 32px; height: 32px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); }
         .post-caption { margin-bottom: 10px; line-height: 1.4; }
         .post-media { width: 100%; border-radius: 15px; margin-bottom: 10px; max-height: 400px; object-fit: cover; }
         .post-actions { display: flex; gap: 20px; font-size: 13px; opacity: 0.8; }
+        .delete-icon { cursor: pointer; color: rgba(255,255,255,0.4); font-size: 14px; padding: 5px; }
+        .delete-icon:hover { color: #ff4b2b; }
     </style>
 </head>
 <body>
@@ -113,7 +115,9 @@
                 </div>
             </div>
 
-            <div id="feed-display"></div>
+            <div id="feed-display">
+                <p style="text-align:center; opacity:0.5;">Loading feed...</p>
+            </div>
         </div>
     </div>
 
@@ -122,7 +126,144 @@
         document.getElementById('user-greeting').innerText = myName;
         document.getElementById('my-profile-link').href = `profile.html?user=${myName}`;
 
-        // SEARCH LOGIC
+        const fileInput = document.getElementById('media-upload');
+        const fileNameLabel = document.getElementById('file-name');
+
+        fileInput.onchange = () => {
+            if (fileInput.files.length > 0) fileNameLabel.innerText = fileInput.files[0].name;
+        };
+
+        // --- FEED LOGIC (FETCH FROM DB) ---
+        async function loadFeed() {
+            try {
+                const response = await fetch('/api/posts');
+                const posts = await response.json();
+                const feed = document.getElementById('feed-display');
+                feed.innerHTML = ''; 
+
+                if (posts.length === 0) {
+                    feed.innerHTML = '<p style="text-align:center; opacity:0.5;">No posts yet. Be the first!</p>';
+                    return;
+                }
+
+                posts.forEach(post => {
+                    const postDiv = document.createElement('div');
+                    postDiv.className = 'post';
+                    postDiv.id = `post-${post._id}`;
+                    
+                    let mediaHTML = '';
+                    if (post.media) {
+                        mediaHTML = post.type === 'video' 
+                            ? `<video src="${post.media}" class="post-media" controls></video>` 
+                            : `<img src="${post.media}" class="post-media">`;
+                    }
+                    
+                    renderPostHTML(postDiv, post.sender, post.caption, mediaHTML, post._id);
+                    feed.appendChild(postDiv);
+                });
+            } catch (err) {
+                console.error("Error loading feed:", err);
+            }
+        }
+
+        // --- POST LOGIC (SAVE TO DB) ---
+        async function createPost() {
+            const caption = document.getElementById('post-caption').value;
+            const file = fileInput.files[0];
+            const postBtn = document.querySelector('.post-btn');
+
+            if (!caption && !file) return;
+
+            postBtn.innerText = "Posting...";
+            postBtn.disabled = true;
+
+            let mediaBase64 = '';
+            let fileType = '';
+
+            if (file) {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                await new Promise(resolve => reader.onload = () => {
+                    mediaBase64 = reader.result;
+                    fileType = file.type.startsWith('video') ? 'video' : 'image';
+                    resolve();
+                });
+            }
+
+            try {
+                const response = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sender: myName,
+                        caption: caption,
+                        media: mediaBase64,
+                        type: fileType
+                    })
+                });
+
+                if (response.ok) {
+                    document.getElementById('post-caption').value = '';
+                    fileInput.value = '';
+                    fileNameLabel.innerText = 'No file selected';
+                    loadFeed(); 
+                }
+            } catch (err) {
+                alert("Post failed to upload.");
+            } finally {
+                postBtn.innerText = "Post";
+                postBtn.disabled = false;
+            }
+        }
+
+        function renderPostHTML(container, sender, caption, media, postId) {
+            const userInitial = sender.charAt(0).toUpperCase();
+            
+            // Only show delete icon if it's MY post
+            const deleteBtn = (sender === myName) 
+                ? `<i class="fas fa-trash-alt delete-icon" onclick="deletePost('${postId}')"></i>` 
+                : '';
+
+            container.innerHTML = `
+                <div class="post-header">
+                    <a href="profile.html?user=${sender}" class="post-user-link">
+                        <div class="mini-avatar">${userInitial}</div>
+                        <span>${sender}</span>
+                    </a>
+                    ${deleteBtn}
+                </div>
+                ${media}
+                <div class="post-caption"><b>${sender}</b> ${caption}</div>
+                <div class="post-actions">
+                    <span onclick="handleLike(this)" style="cursor:pointer;"><i class="far fa-heart"></i> <span class="like-count">0</span> Likes</span>
+                </div>
+            `;
+        }
+
+        // --- DELETE LOGIC ---
+        async function deletePost(postId) {
+            if (!confirm("Delete this post forever?")) return;
+
+            try {
+                const response = await fetch(`/api/posts/${postId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: myName })
+                });
+
+                if (response.ok) {
+                    const element = document.getElementById(`post-${postId}`);
+                    element.style.opacity = '0';
+                    setTimeout(() => element.remove(), 300);
+                } else {
+                    alert("Delete failed.");
+                }
+            } catch (err) {
+                console.error("Error deleting:", err);
+            }
+        }
+
+        // --- SEARCH LOGIC ---
         async function searchUsers(query) {
             const resultsDiv = document.getElementById('search-results');
             if (query.length < 1) {
@@ -150,58 +291,6 @@
             }
         }
 
-        // POST LOGIC
-        const fileInput = document.getElementById('media-upload');
-        const fileNameLabel = document.getElementById('file-name');
-
-        fileInput.onchange = () => {
-            if (fileInput.files.length > 0) fileNameLabel.innerText = fileInput.files[0].name;
-        };
-
-        function createPost() {
-            const caption = document.getElementById('post-caption').value;
-            const file = fileInput.files[0];
-            if (!caption && !file) return;
-
-            const postDiv = document.createElement('div');
-            postDiv.className = 'post';
-
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const src = e.target.result;
-                    let mediaHTML = file.type.startsWith('image/') 
-                        ? `<img src="${src}" class="post-media">` 
-                        : `<video src="${src}" class="post-media" controls></video>`;
-                    finishPost(postDiv, caption, mediaHTML);
-                };
-                reader.readAsDataURL(file);
-            } else {
-                finishPost(postDiv, caption, '');
-            }
-        }
-
-        function finishPost(container, caption, media) {
-            const userInitial = myName.charAt(0).toUpperCase();
-            container.innerHTML = `
-                <div class="post-header">
-                    <a href="profile.html?user=${myName}" class="post-user-link">
-                        <div class="mini-avatar">${userInitial}</div>
-                        <span>${myName}</span>
-                    </a>
-                </div>
-                ${media}
-                <div class="post-caption">${caption}</div>
-                <div class="post-actions">
-                    <span onclick="handleLike(this)" style="cursor:pointer;"><i class="far fa-heart"></i> <span class="like-count">0</span> Likes</span>
-                </div>
-            `;
-            document.getElementById('feed-display').prepend(container);
-            document.getElementById('post-caption').value = '';
-            fileInput.value = '';
-            fileNameLabel.innerText = 'No file selected';
-        }
-
         function handleLike(btn) {
             const icon = btn.querySelector('i');
             const countSpan = btn.querySelector('.like-count');
@@ -216,6 +305,9 @@
                 countSpan.innerText = count - 1;
             }
         }
+
+        // Run on start
+        loadFeed();
     </script>
 </body>
 </html>
