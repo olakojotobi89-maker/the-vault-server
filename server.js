@@ -11,7 +11,7 @@ const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] } 
 });
 
-// Increase limit to handle Base64 images/videos
+// Increase limit to handle Base64 images/videos/audio
 app.use(express.json({ limit: '50mb' }));
 app.use(cors());
 app.use(express.static(path.join(__dirname)));
@@ -62,7 +62,7 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// 1. CHAT HISTORY: Fetch messages between two specific users
+// 1. CHAT HISTORY
 app.get('/api/chat/:user1/:user2', async (req, res) => {
     try {
         const { user1, user2 } = req.params;
@@ -78,12 +78,11 @@ app.get('/api/chat/:user1/:user2', async (req, res) => {
     }
 });
 
-// 2. DELETE MESSAGE: Securely remove a message
+// 2. DELETE MESSAGE
 app.delete('/api/chat/:messageId', async (req, res) => {
     try {
         const { username } = req.body;
         const msg = await Message.findById(req.params.messageId);
-        
         if (!msg) return res.status(404).json({ error: "Message not found" });
         if (msg.sender !== username) return res.status(403).json({ error: "Unauthorized" });
 
@@ -124,17 +123,24 @@ app.delete('/api/posts/:postId', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Delete failed" }); }
 });
 
-// 4. USER & PROFILE
+// 4. USER & PROFILE (UPDATED FOR FRIENDS LIST)
 app.get('/api/profile/:username', async (req, res) => {
     try {
-        const user = await User.findOne({ username: req.params.username });
+        // Populating 'username' for the friends list modal
+        const user = await User.findOne({ username: req.params.username })
+                               .populate('followers following', 'username');
+
         if (!user) return res.status(404).json({ error: "User not found" });
+        
         const userPosts = await Post.find({ sender: req.params.username }).sort({ timestamp: -1 });
+        
         res.json({
             username: user.username,
             bio: user.bio,
             followersCount: user.followers.length,
             followingCount: user.following.length,
+            followers: user.followers, // Send the actual objects for the modal
+            following: user.following, // Send the actual objects for the modal
             posts: userPosts
         });
     } catch (err) { res.status(500).json({ error: "Server error" }); }
@@ -145,8 +151,11 @@ app.post('/api/follow', async (req, res) => {
     try {
         const me = await User.findOne({ username: myUsername });
         const target = await User.findOne({ username: targetUsername });
+
         if (me && target) {
-            const isFollowing = me.following.includes(target._id);
+            // Check if already following using ID comparison
+            const isFollowing = me.following.some(id => id.equals(target._id));
+
             if (isFollowing) {
                 me.following.pull(target._id);
                 target.followers.pull(me._id);
@@ -154,8 +163,13 @@ app.post('/api/follow', async (req, res) => {
                 me.following.push(target._id);
                 target.followers.push(me._id);
             }
-            await me.save(); await target.save();
-            res.json({ success: true, isFollowingNow: !isFollowing, followerCount: target.followers.length });
+            await me.save(); 
+            await target.save();
+            res.json({ 
+                success: true, 
+                isFollowingNow: !isFollowing, 
+                followerCount: target.followers.length 
+            });
         }
     } catch (err) { res.status(500).json({ error: "Follow failed" }); }
 });
@@ -183,10 +197,9 @@ app.post('/api/signup', async (req, res) => {
 
 // --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
-    // Join a unique room named after the user
     socket.on('join_private', (username) => {
         socket.join(username);
-        console.log(`📡 ${username} is now online and in their private room.`);
+        console.log(`📡 ${username} joined private room.`);
     });
 
     socket.on('send_message', async (data) => {
@@ -200,7 +213,6 @@ io.on('connection', (socket) => {
                 timestamp: newMessage.timestamp 
             };
 
-            // Only emit to the two people involved
             io.to(receiver).emit('receive_message', messageData);
             io.to(sender).emit('receive_message', messageData);
         } catch (err) {
