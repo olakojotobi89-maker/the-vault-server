@@ -3,7 +3,6 @@ const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const nodemailer = require('nodemailer');
 const path = require('path');
 
 const app = express();
@@ -12,8 +11,9 @@ const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] } 
 });
 
+// Increase limit to handle Base64 images/videos
+app.use(express.json({ limit: '50mb' }));
 app.use(cors());
-app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
 app.get('/', (req, res) => {
@@ -42,8 +42,8 @@ const User = mongoose.model('User', new mongoose.Schema({
 const Post = mongoose.model('Post', new mongoose.Schema({
     sender: String,
     caption: String,
-    media: String, // Base64 string or URL
-    type: String,  // 'image' or 'video'
+    media: String, 
+    type: String,  
     timestamp: { type: Date, default: Date.now }
 }));
 
@@ -55,11 +55,30 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// NEW: Search for Users
+// NEW: Delete Post Route
+app.delete('/api/posts/:postId', async (req, res) => {
+    try {
+        const { username } = req.body; // Sender's name passed from frontend
+        const post = await Post.findById(req.params.postId);
+
+        if (!post) return res.status(404).json({ error: "Post not found" });
+
+        // Security Check: Only the owner can delete
+        if (post.sender !== username) {
+            return res.status(403).json({ error: "Unauthorized: You can only delete your own posts" });
+        }
+
+        await Post.findByIdAndDelete(req.params.postId);
+        res.json({ success: true, message: "Post deleted" });
+    } catch (err) {
+        res.status(500).json({ error: "Delete failed" });
+    }
+});
+
+// Search for Users
 app.get('/api/search/:query', async (req, res) => {
     try {
         const query = req.params.query;
-        // Finds users starting with the query (case-insensitive)
         const users = await User.find({ 
             username: { $regex: '^' + query, $options: 'i' } 
         }).select('username').limit(5);
@@ -69,7 +88,7 @@ app.get('/api/search/:query', async (req, res) => {
     }
 });
 
-// NEW: Save a New Post to Database
+// Save Post
 app.post('/api/posts', async (req, res) => {
     try {
         const { sender, caption, media, type } = req.body;
@@ -81,7 +100,7 @@ app.post('/api/posts', async (req, res) => {
     }
 });
 
-// NEW: Get All Posts for Feed
+// Get Feed (Now returns _id)
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(20);
@@ -91,38 +110,33 @@ app.get('/api/posts', async (req, res) => {
     }
 });
 
+// Profile Logic
 app.get('/api/profile/:username', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.params.username });
         if (!user) return res.status(404).json({ error: "User not found" });
-
         const userPosts = await Post.find({ sender: req.params.username }).sort({ timestamp: -1 });
-
         res.json({
             username: user.username,
             bio: user.bio,
             followersCount: user.followers.length,
             followingCount: user.following.length,
-            posts: userPosts,
-            followersList: user.followers // For checking follow status
+            posts: userPosts
         });
     } catch (err) {
-        res.status(500).json({ error: "Server error fetching profile" });
+        res.status(500).json({ error: "Server error" });
     }
 });
 
+// Follow Logic
 app.post('/api/follow', async (req, res) => {
     const { myUsername, targetUsername } = req.body;
-    if (myUsername === targetUsername) return res.status(400).json({ error: "You cannot follow yourself" });
-
     try {
         const me = await User.findOne({ username: myUsername });
         const target = await User.findOne({ username: targetUsername });
-
         if (!me || !target) return res.status(404).json({ error: "User not found" });
 
         const isFollowing = me.following.includes(target._id);
-
         if (isFollowing) {
             me.following.pull(target._id);
             target.followers.pull(me._id);
@@ -130,27 +144,18 @@ app.post('/api/follow', async (req, res) => {
             me.following.push(target._id);
             target.followers.push(me._id);
         }
-
         await me.save();
         await target.save();
-
-        res.json({ 
-            success: true, 
-            isFollowingNow: !isFollowing,
-            followerCount: target.followers.length 
-        });
-    } catch (err) {
-        res.status(500).json({ error: "Follow action failed" });
-    }
+        res.json({ success: true, isFollowingNow: !isFollowing, followerCount: target.followers.length });
+    } catch (err) { res.status(500).json({ error: "Follow failed" }); }
 });
 
+// Login/Signup
 app.post('/api/login', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        const user = await User.findOne({ username, password });
-        if (!user) return res.status(401).json({ error: "Invalid username or password" });
-        res.json({ message: "Access Granted", username: user.username });
-    } catch (err) { res.status(500).json({ error: "Database error." }); }
+    const { username, password } = req.body;
+    const user = await User.findOne({ username, password });
+    if (!user) return res.status(401).json({ error: "Access Denied" });
+    res.json({ message: "Access Granted", username: user.username });
 });
 
 app.post('/api/signup', async (req, res) => {
@@ -158,24 +163,19 @@ app.post('/api/signup', async (req, res) => {
         const { username, password, email, phone } = req.body;
         const newUser = new User({ username, password, email, phone });
         await newUser.save();
-        res.json({ message: "Success! Account created." });
-    } catch (err) {
-        if (err.code === 11000) return res.status(400).json({ error: "Username already taken!" });
-        res.status(500).json({ error: "Error creating account." });
-    }
+        res.json({ message: "Success" });
+    } catch (err) { res.status(500).json({ error: "Signup failed" }); }
 });
 
-// Real-time Chat
+// Socket Logic
 io.on('connection', (socket) => {
     socket.on('send_message', async (data) => {
-        try {
-            await Message.create({ sender: data.sender, content: data.content });
-            io.emit('receive_message', data);
-        } catch (err) { console.error("Socket Error:", err); }
+        await Message.create({ sender: data.sender, content: data.content });
+        io.emit('receive_message', data);
     });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🚀 VAULT SERVER IS ACTIVE ON PORT ${PORT}`);
+    console.log(`🚀 VAULT SERVER ACTIVE ON PORT ${PORT}`);
 });
