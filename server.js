@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
+const path = require('path'); // Added surgically for file handling
 
 const app = express();
 const server = http.createServer(app);
@@ -14,9 +15,19 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
+// --- SERVE FRONTEND FILES ---
+// This allows Render to serve your index.html, CSS, and JS files
+app.use(express.static(path.join(__dirname)));
+
+// --- HOME ROUTE ---
+// This fixes the "Cannot GET /" error by sending your main HTML file
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // --- MONGODB CONNECTION (LEGACY STABLE VERSION) ---
 // This version is much harder for mobile networks to block
-const MONGO_URI = "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017,cluster0-shard-00-01.fuesl9b.mongodb.net:27017,cluster0-shard-00-02.fuesl9b.mongodb.net:27017/vaultDB?ssl=true&replicaSet=atlas-fuesl9b-shard-0&authSource=admin&retryWrites=true&w=majority";
+const MONGO_URI = process.env.MONGO_URI || "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017,cluster0-shard-00-01.fuesl9b.mongodb.net:27017,cluster0-shard-00-02.fuesl9b.mongodb.net:27017/vaultDB?ssl=true&replicaSet=atlas-fuesl9b-shard-0&authSource=admin&retryWrites=true&w=majority";
 
 mongoose.connect(MONGO_URI, {
     serverSelectionTimeoutMS: 10000 // Giving it 10 seconds for mobile data lag
