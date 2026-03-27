@@ -66,9 +66,12 @@
         .received { background: white; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; }
         .sent { background: linear-gradient(to right, #00d2ff, #3a7bd5); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
 
+        /* Tick Styling */
+        .tick { font-size: 10px; margin-left: 5px; opacity: 0.5; transition: 0.3s; }
+        .tick.seen { color: #00d2ff !important; opacity: 1 !important; }
+
         .sent-img { max-width: 100%; border-radius: 15px; margin-top: 5px; display: block; }
 
-        /* Voice Note Styling */
         .voice-note-ui { display: flex; align-items: center; gap: 10px; min-width: 140px; cursor: pointer; padding: 5px 0; }
         .vn-play-btn { font-size: 1.2rem; }
         .vn-track { flex: 1; height: 3px; background: rgba(0,0,0,0.1); border-radius: 2px; position: relative; }
@@ -177,34 +180,52 @@
 
         socket.emit('join_private', loggedInUser);
 
+        async function markAsRead() {
+            try {
+                await fetch('/api/chat/read', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reader: loggedInUser, sender: targetUser })
+                });
+                socket.emit('mark_read', { reader: loggedInUser, sender: targetUser });
+            } catch (err) { console.error("Mark read error:", err); }
+        }
+
         async function loadHistory() {
             try {
                 const res = await fetch(`/api/chat/${loggedInUser}/${targetUser}`);
                 const history = await res.json();
                 chatBox.innerHTML = "";
                 history.forEach(msg => {
-                    appendMessage(msg.content, msg.sender === loggedInUser ? 'sent' : 'received', msg.type, msg._id);
+                    appendMessage(msg.content, msg.sender === loggedInUser ? 'sent' : 'received', msg.type, msg._id, msg.seen);
                 });
+                markAsRead(); // Mark existing messages as read when you enter the chat
             } catch (err) { console.error("History error:", err); }
         }
 
-        function appendMessage(content, type = 'sent', msgType = 'text', id = null) {
+        function appendMessage(content, type = 'sent', msgType = 'text', id = null, seen = false) {
             const msg = document.createElement('div');
             msg.className = `message ${type}`;
             if (id) msg.setAttribute('data-id', id);
             
+            let htmlBody = "";
             if (msgType === 'image') {
-                msg.innerHTML = `<img src="${content}" class="sent-img">`;
+                htmlBody = `<img src="${content}" class="sent-img">`;
             } else if (msgType === 'voice') {
-                msg.innerHTML = `
+                htmlBody = `
                     <div class="voice-note-ui" onclick="playVoice(this, '${content}')">
                         <i class="fas fa-play vn-play-btn"></i>
                         <div class="vn-track"><div class="vn-progress"></div></div>
                     </div>
                 `;
             } else {
-                msg.innerText = content;
+                htmlBody = `<span>${content}</span>`;
             }
+
+            // Ticks only for sent messages
+            const ticks = type === 'sent' ? `<i class="fas fa-check-double tick ${seen ? 'seen' : ''}"></i>` : '';
+            
+            msg.innerHTML = htmlBody + ticks;
             
             // Delete Logic
             if (type === 'sent') {
@@ -218,6 +239,13 @@
             chatBox.appendChild(msg);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
+
+        // When receiver views messages, sender's ticks turn blue
+        socket.on('messages_viewed', (data) => {
+            if (data.viewer === targetUser) {
+                document.querySelectorAll('.tick').forEach(tick => tick.classList.add('seen'));
+            }
+        });
 
         function playVoice(el, base64) {
             const audio = new Audio(base64);
@@ -285,7 +313,6 @@
             }
         }
 
-        // Mouse/Touch Events for Hold-to-Record
         micBtn.onmousedown = startRec; micBtn.onmouseup = stopRec;
         micBtn.ontouchstart = (e) => { e.preventDefault(); startRec(); }; 
         micBtn.ontouchend = (e) => { e.preventDefault(); stopRec(); };
@@ -313,7 +340,8 @@
         socket.on('receive_message', (data) => {
             if ((data.sender === targetUser && data.receiver === loggedInUser) || 
                 (data.sender === loggedInUser && data.receiver === targetUser)) {
-                appendMessage(data.content, data.sender === loggedInUser ? 'sent' : 'received', data.type, data._id);
+                appendMessage(data.content, data.sender === loggedInUser ? 'sent' : 'received', data.type, data._id, data.seen);
+                if (data.sender === targetUser) markAsRead(); // Mark as read if you are viewing it live
             }
         });
 
