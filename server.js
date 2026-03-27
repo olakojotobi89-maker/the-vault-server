@@ -45,7 +45,7 @@ const Post = mongoose.model('Post', new mongoose.Schema({
     media: String, 
     type: String,  
     timestamp: { type: Date, default: Date.now },
-    // NEW: Added comments array to the Schema
+    // Stores comments with user and text
     comments: [{
         user: String,
         text: String,
@@ -61,7 +61,7 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// NEW: Add Comment Route
+// Add Comment to a Post
 app.post('/api/posts/:postId/comment', async (req, res) => {
     try {
         const { user, text } = req.body;
@@ -86,6 +86,7 @@ app.delete('/api/posts/:postId', async (req, res) => {
 
         if (!post) return res.status(404).json({ error: "Post not found" });
 
+        // Security Check: Only the owner can delete
         if (post.sender !== username) {
             return res.status(403).json({ error: "Unauthorized" });
         }
@@ -110,7 +111,7 @@ app.get('/api/search/:query', async (req, res) => {
     }
 });
 
-// Save Post
+// Create a New Post
 app.post('/api/posts', async (req, res) => {
     try {
         const { sender, caption, media, type } = req.body;
@@ -122,7 +123,7 @@ app.post('/api/posts', async (req, res) => {
     }
 });
 
-// Get Feed
+// Fetch Feed (Sorted by newest first)
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(20);
@@ -150,7 +151,7 @@ app.get('/api/profile/:username', async (req, res) => {
     }
 });
 
-// Follow Logic
+// Follow/Unfollow Logic
 app.post('/api/follow', async (req, res) => {
     const { myUsername, targetUsername } = req.body;
     try {
@@ -172,7 +173,7 @@ app.post('/api/follow', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Follow failed" }); }
 });
 
-// Login/Signup
+// User Login
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     const user = await User.findOne({ username, password });
@@ -180,6 +181,7 @@ app.post('/api/login', async (req, res) => {
     res.json({ message: "Access Granted", username: user.username });
 });
 
+// User Signup
 app.post('/api/signup', async (req, res) => {
     try {
         const { username, password, email, phone } = req.body;
@@ -189,11 +191,17 @@ app.post('/api/signup', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Signup failed" }); }
 });
 
-// Socket Logic
+// --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
+    // Handling Chat Messages
     socket.on('send_message', async (data) => {
         await Message.create({ sender: data.sender, content: data.content });
         io.emit('receive_message', data);
+    });
+
+    // Handling Real-time Like Notifications
+    socket.on('send_like', (data) => {
+        io.emit('receive_like', data);
     });
 });
 
