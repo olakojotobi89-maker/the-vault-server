@@ -23,21 +23,19 @@ app.get('/', (req, res) => {
 });
 
 // --- MONGODB CONNECTION ---
-// SINGLE-SHARD DIRECT MODE: Connects to exactly one host for maximum VPN stability.
-// This bypasses the discovery phase that usually causes ETIMEOUT errors on slow connections.
-const MONGO_URI = "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017/vaultDB?ssl=true&authSource=admin&retryWrites=true&w=majority";
+// FORCED DIRECT MODE: Optimized for VPN/Hotspot handshakes.
+// IMPORTANT: You MUST set Atlas Network Access to 0.0.0.0/0 for this to work.
+const MONGO_URI = "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017/vaultDB?ssl=true&authSource=admin&directConnection=true";
 
 mongoose.connect(MONGO_URI, {
     serverSelectionTimeoutMS: 60000, 
-    connectTimeoutMS: 60000,         
     family: 4,                       
-    directConnection: true,          // Now valid because URI has exactly one host
     tlsAllowInvalidCertificates: true 
 })
-    .then(() => console.log("☁️ Connected to MongoDB Cloud (Single-Shard Mode)!"))
+    .then(() => console.log("🚀 VAULT DATABASE CONNECTED SUCCESSFULLY!"))
     .catch(err => {
-        console.error("❌ MongoDB Connection Error:", err);
-        console.log("👉 Troubleshooting: Ensure MongoDB Atlas Whitelist is 0.0.0.0/0 and VPN is active.");
+        console.error("❌ CONNECTION REJECTED:", err.message);
+        console.log("👉 ACTION REQUIRED: Add 0.0.0.0/0 to your MongoDB Atlas Network Access whitelist.");
     });
 
 // --- DATABASE SCHEMAS ---
@@ -83,7 +81,7 @@ app.post('/api/signup', async (req, res) => {
         await newUser.save();
         res.json({ success: true, message: "User created" });
     } catch (err) { 
-        res.status(400).json({ error: "Username might already exist or data is invalid" }); 
+        res.status(400).json({ error: "Username might already exist" }); 
     }
 });
 
