@@ -4,7 +4,7 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const bcrypt = require('bcryptjs'); // Added for security
+const bcrypt = require('bcryptjs'); 
 
 const app = express();
 const server = http.createServer(app);
@@ -22,11 +22,15 @@ app.get('/', (req, res) => {
 });
 
 // --- MONGODB CONNECTION ---
-const MONGO_URI = process.env.MONGO_URI || "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017,cluster0-shard-00-01.fuesl9b.mongodb.net:27017,cluster0-shard-00-02.fuesl9b.mongodb.net:27017/vaultDB?ssl=true&replicaSet=atlas-fuesl9b-shard-0&authSource=admin&retryWrites=true&w=majority";
+// Using the simplified SRV string for better stability
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://olakojotobi89_db_user:VaultPass2026@cluster0.fuesl9b.mongodb.net/vaultDB?retryWrites=true&w=majority";
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log("☁️ Connected to MongoDB Cloud!"))
-    .catch(err => console.error("❌ MongoDB Connection Error:", err));
+    .then(() => console.log("☁️ Connected to MongoDB Cloud (SRV Mode)!"))
+    .catch(err => {
+        console.error("❌ MongoDB Connection Error:", err);
+        console.log("👉 Reminder: Ensure IP 0.0.0.0/0 is whitelisted in MongoDB Atlas Network Access.");
+    });
 
 // --- DATABASE SCHEMAS ---
 
@@ -65,7 +69,7 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// 1. AUTH (Fixed with Hashing)
+// 1. AUTH
 app.post('/api/signup', async (req, res) => {
     try {
         const { username, password, email, phone } = req.body;
@@ -105,7 +109,7 @@ app.get('/api/chat/:user1/:user2', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Fetch failed" }); }
 });
 
-// 3. POSTS (Simplified & Safe)
+// 3. POSTS
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(30);
@@ -113,7 +117,7 @@ app.get('/api/posts', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Fetch failed" }); }
 });
 
-// 4. SEARCH (Fixed regex and error handling)
+// 4. SEARCH
 app.get('/api/search/:query', async (req, res) => {
     try {
         const users = await User.find({ 
@@ -136,19 +140,19 @@ io.on('connection', (socket) => {
 
             const newMessage = await Message.create({ sender, receiver, content, type });
             
-            // Emit the database-saved version (includes _id and correct timestamp)
             io.to(receiver).emit('receive_message', newMessage);
             io.to(sender).emit('receive_message', newMessage);
         } catch (err) { console.error("Socket Error:", err); }
     });
 
     socket.on('mark_read', async (data) => {
-        // Update DB when socket triggers mark_read
-        await Message.updateMany(
-            { sender: data.sender, receiver: data.reader, seen: false },
-            { $set: { seen: true } }
-        );
-        io.to(data.sender).emit('messages_viewed', { viewer: data.reader });
+        try {
+            await Message.updateMany(
+                { sender: data.sender, receiver: data.reader, seen: false },
+                { $set: { seen: true } }
+            );
+            io.to(data.sender).emit('messages_viewed', { viewer: data.reader });
+        } catch (err) { console.error("Mark Read Error:", err); }
     });
 });
 
