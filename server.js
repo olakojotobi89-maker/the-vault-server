@@ -1,3 +1,4 @@
+require('dotenv').config(); 
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -22,18 +23,17 @@ app.get('/', (req, res) => {
 });
 
 // --- MONGODB CONNECTION ---
-// Using the simplified SRV string for better stability
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://olakojotobi89_db_user:VaultPass2026@cluster0.fuesl9b.mongodb.net/vaultDB?retryWrites=true&w=majority";
+// Hardcoded stable long-form string to bypass .env "undefined" issues
+const MONGO_URI = "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017,cluster0-shard-00-01.fuesl9b.mongodb.net:27017,cluster0-shard-00-02.fuesl9b.mongodb.net:27017/vaultDB?ssl=true&replicaSet=atlas-fuesl9b-shard-0&authSource=admin&retryWrites=true&w=majority";
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log("☁️ Connected to MongoDB Cloud (SRV Mode)!"))
+    .then(() => console.log("☁️ Connected to MongoDB Cloud (Stable Mode)!"))
     .catch(err => {
         console.error("❌ MongoDB Connection Error:", err);
-        console.log("👉 Reminder: Ensure IP 0.0.0.0/0 is whitelisted in MongoDB Atlas Network Access.");
+        console.log("👉 Troubleshooting: Ensure IP 0.0.0.0/0 is whitelisted in MongoDB Atlas.");
     });
 
 // --- DATABASE SCHEMAS ---
-
 const UserSchema = new mongoose.Schema({
     username: { type: String, unique: true, required: true, index: true },
     password: { type: String, required: true },
@@ -68,8 +68,6 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 }));
 
 // --- API ROUTES ---
-
-// 1. AUTH
 app.post('/api/signup', async (req, res) => {
     try {
         const { username, password, email, phone } = req.body;
@@ -95,7 +93,6 @@ app.post('/api/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Login error" }); }
 });
 
-// 2. CHAT & MESSAGES
 app.get('/api/chat/:user1/:user2', async (req, res) => {
     try {
         const { user1, user2 } = req.params;
@@ -109,7 +106,6 @@ app.get('/api/chat/:user1/:user2', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Fetch failed" }); }
 });
 
-// 3. POSTS
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(30);
@@ -117,7 +113,6 @@ app.get('/api/posts', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Fetch failed" }); }
 });
 
-// 4. SEARCH
 app.get('/api/search/:query', async (req, res) => {
     try {
         const users = await User.find({ 
