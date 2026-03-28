@@ -19,32 +19,29 @@ app.use(cors());
 app.use(express.static(path.join(__dirname)));
 
 // --- ROUTES ---
-// Primary route for your index.html
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Fallback route in case you or the browser looks for /login
+// Fallback in case the browser or frontend explicitly calls /login
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- MONGODB CONNECTION ---
-// Optimized for VPN/Hotspot stability
-const MONGO_URI = "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017/vaultDB?authSource=admin";
+// --- MONGODB CONNECTION: NUCLEAR OPTION ---
+// Explicitly listing all shards to bypass VPN SRV resolution issues.
+const MONGO_URI = "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017,cluster0-shard-00-01.fuesl9b.mongodb.net:27017,cluster0-shard-00-02.fuesl9b.mongodb.net:27017/vaultDB?ssl=true&replicaSet=atlas-fuesl9b-shard-0&authSource=admin";
 
 mongoose.connect(MONGO_URI, {
-    directConnection: true,          
     serverSelectionTimeoutMS: 60000, 
-    connectTimeoutMS: 60000,         
-    family: 4,                       
-    tls: true,                       
-    tlsAllowInvalidCertificates: true 
+    connectTimeoutMS: 60000,
+    family: 4,                       // Force IPv4 for VPN compatibility
+    tlsAllowInvalidCertificates: true // Essential for bypassing local SSL/VPN inspection
 })
     .then(() => console.log("🚀 VAULT DATABASE CONNECTED SUCCESSFULLY!"))
     .catch(err => {
         console.error("❌ CONNECTION REJECTED:", err.message);
-        console.log("👉 Troubleshooting: Ensure Proton VPN is on WireGuard/TCP and Atlas is set to 0.0.0.0/0");
+        console.log("👉 Troubleshooting: Ensure Proton VPN is on WireGuard or OpenVPN (TCP) and Atlas is set to 0.0.0.0/0");
     });
 
 // --- DATABASE SCHEMAS ---
