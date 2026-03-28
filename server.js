@@ -19,12 +19,16 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- MONGODB CONNECTION ---
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://olakojotobi89_db_user:VaultPass2026@cluster0.fuesl9b.mongodb.net/vaultDB?retryWrites=true&w=majority";
+// --- MONGODB CONNECTION (Standard Multi-Seed Format) ---
+// This format is more stable for bypassing DNS blocks/ECONNREFUSED
+const MONGO_URI = process.env.MONGO_URI || "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017,cluster0-shard-00-01.fuesl9b.mongodb.net:27017,cluster0-shard-00-02.fuesl9b.mongodb.net:27017/vaultDB?ssl=true&replicaSet=atlas-fuesl9b-shard-0&authSource=admin&retryWrites=true&w=majority";
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log("☁️ Connected to MongoDB Cloud!"))
-    .catch(err => console.error("❌ MongoDB Connection Error:", err));
+    .then(() => console.log("☁️ Connected to MongoDB Cloud (Standard Mode)!"))
+    .catch(err => {
+        console.error("❌ MongoDB Connection Error:", err);
+        console.log("💡 Tip: If still refused, ensure 0.0.0.0/0 is in Atlas Network Access and check your local firewall.");
+    });
 
 // --- DATABASE SCHEMAS ---
 
@@ -57,7 +61,7 @@ const Message = mongoose.model('Message', new mongoose.Schema({
     content: { type: String, required: true },
     type: { type: String, default: 'text' }, 
     timestamp: { type: Date, default: Date.now },
-    seen: { type: Boolean, default: false } // NEW: Track read status
+    seen: { type: Boolean, default: false } // Blue Tick Status
 }));
 
 // --- API ROUTES ---
@@ -78,7 +82,7 @@ app.get('/api/chat/:user1/:user2', async (req, res) => {
     }
 });
 
-// NEW: MARK MESSAGES AS READ
+// MARK MESSAGES AS READ (Triggers Blue Ticks)
 app.post('/api/chat/read', async (req, res) => {
     try {
         const { reader, sender } = req.body;
@@ -225,7 +229,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // NEW: Notify original sender that their message was read
+    // Notify original sender that their message was read
     socket.on('mark_read', (data) => {
         io.to(data.sender).emit('messages_viewed', { viewer: data.reader });
     });
