@@ -23,21 +23,21 @@ app.get('/', (req, res) => {
 });
 
 // --- MONGODB CONNECTION ---
-// SINGLE-SHARD DIRECT MODE: Pointing to a single host to satisfy the directConnection requirement.
-// This bypasses replica set discovery which often fails over slow VPN/Hotspot connections.
+// SINGLE-SHARD DIRECT MODE: Connects to exactly one host for maximum VPN stability.
+// This bypasses the discovery phase that usually causes ETIMEOUT errors on slow connections.
 const MONGO_URI = "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017/vaultDB?ssl=true&authSource=admin&retryWrites=true&w=majority";
 
 mongoose.connect(MONGO_URI, {
     serverSelectionTimeoutMS: 60000, 
     connectTimeoutMS: 60000,         
     family: 4,                       
-    directConnection: true,          // Now valid because we are using exactly one host above
+    directConnection: true,          // Now valid because URI has exactly one host
     tlsAllowInvalidCertificates: true 
 })
-    .then(() => console.log("☁️ Connected to MongoDB Cloud (Single-Shard Direct Mode)!"))
+    .then(() => console.log("☁️ Connected to MongoDB Cloud (Single-Shard Mode)!"))
     .catch(err => {
         console.error("❌ MongoDB Connection Error:", err);
-        console.log("👉 Troubleshooting: Ensure Proton VPN is on OpenVPN TCP or try Cloudflare WARP.");
+        console.log("👉 Troubleshooting: Ensure MongoDB Atlas Whitelist is 0.0.0.0/0 and VPN is active.");
     });
 
 // --- DATABASE SCHEMAS ---
