@@ -23,26 +23,22 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Fallback to index.html if /login is requested
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- MONGODB CONNECTION: LEGACY STABLE MODE ---
-// This bypasses SRV lookup and uses direct shard addressing for VPN/Hotspot stability.
+// --- MONGODB CONNECTION: CLEAN MODERN MODE ---
+// Listing shards directly is still the best way to beat VPN DNS issues.
 const MONGO_URI = "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017,cluster0-shard-00-01.fuesl9b.mongodb.net:27017,cluster0-shard-00-02.fuesl9b.mongodb.net:27017/vaultDB?ssl=true&replicaSet=atlas-fuesl9b-shard-0&authSource=admin";
 
 mongoose.connect(MONGO_URI, {
-    useNewUrlParser: true,      // Legacy driver requirement
-    useUnifiedTopology: true,   // Legacy driver requirement
     serverSelectionTimeoutMS: 30000, 
-    family: 4,                  // Force IPv4
+    family: 4,                  
     tlsAllowInvalidCertificates: true 
 })
     .then(() => console.log("🚀 VAULT DATABASE CONNECTED SUCCESSFULLY!"))
     .catch(err => {
         console.error("❌ CONNECTION REJECTED:", err.message);
-        console.log("👉 LAST RESORT: Switch Proton VPN to a USA or Japan server and run 'ipconfig /flushdns'.");
     });
 
 // --- DATABASE SCHEMAS ---
