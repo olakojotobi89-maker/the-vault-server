@@ -23,19 +23,22 @@ app.get('/', (req, res) => {
 });
 
 // --- MONGODB CONNECTION ---
-// FORCED DIRECT MODE: Optimized for VPN/Hotspot handshakes.
-// IMPORTANT: You MUST set Atlas Network Access to 0.0.0.0/0 for this to work.
-const MONGO_URI = "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017/vaultDB?ssl=true&authSource=admin&directConnection=true";
+// TUNNEL OPTIMIZED: Uses directConnection and TLS to bypass VPN interference.
+// authSource=admin is required for the user cluster permissions.
+const MONGO_URI = "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017/vaultDB?authSource=admin";
 
 mongoose.connect(MONGO_URI, {
-    serverSelectionTimeoutMS: 60000, 
-    family: 4,                       
-    tlsAllowInvalidCertificates: true 
+    directConnection: true,          // Essential for single-shard VPN bypass
+    serverSelectionTimeoutMS: 60000, // Wait up to 60s for the VPN handshake
+    connectTimeoutMS: 60000,         
+    family: 4,                       // Force IPv4
+    tls: true,                       // Explicitly tell the driver to use SSL/TLS
+    tlsAllowInvalidCertificates: true // Prevents SSL rejection from VPN proxies
 })
     .then(() => console.log("🚀 VAULT DATABASE CONNECTED SUCCESSFULLY!"))
     .catch(err => {
         console.error("❌ CONNECTION REJECTED:", err.message);
-        console.log("👉 ACTION REQUIRED: Add 0.0.0.0/0 to your MongoDB Atlas Network Access whitelist.");
+        console.log("👉 PRO-TIP: Run 'ipconfig /flushdns' in your terminal if this persists.");
     });
 
 // --- DATABASE SCHEMAS ---
