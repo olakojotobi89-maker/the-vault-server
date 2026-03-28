@@ -18,27 +18,33 @@ app.use(express.json({ limit: '50mb' }));
 app.use(cors());
 app.use(express.static(path.join(__dirname)));
 
+// --- ROUTES ---
+// Primary route for your index.html
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Fallback route in case you or the browser looks for /login
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // --- MONGODB CONNECTION ---
-// TUNNEL OPTIMIZED: Uses directConnection and TLS to bypass VPN interference.
-// authSource=admin is required for the user cluster permissions.
+// Optimized for VPN/Hotspot stability
 const MONGO_URI = "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017/vaultDB?authSource=admin";
 
 mongoose.connect(MONGO_URI, {
-    directConnection: true,          // Essential for single-shard VPN bypass
-    serverSelectionTimeoutMS: 60000, // Wait up to 60s for the VPN handshake
+    directConnection: true,          
+    serverSelectionTimeoutMS: 60000, 
     connectTimeoutMS: 60000,         
-    family: 4,                       // Force IPv4
-    tls: true,                       // Explicitly tell the driver to use SSL/TLS
-    tlsAllowInvalidCertificates: true // Prevents SSL rejection from VPN proxies
+    family: 4,                       
+    tls: true,                       
+    tlsAllowInvalidCertificates: true 
 })
     .then(() => console.log("🚀 VAULT DATABASE CONNECTED SUCCESSFULLY!"))
     .catch(err => {
         console.error("❌ CONNECTION REJECTED:", err.message);
-        console.log("👉 PRO-TIP: Run 'ipconfig /flushdns' in your terminal if this persists.");
+        console.log("👉 Troubleshooting: Ensure Proton VPN is on WireGuard/TCP and Atlas is set to 0.0.0.0/0");
     });
 
 // --- DATABASE SCHEMAS ---
