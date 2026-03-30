@@ -78,17 +78,22 @@ const Message = mongoose.model('Message', new mongoose.Schema({
     seen: { type: Boolean, default: false }
 }));
 
-// --- API ROUTES (DEBUG ENABLED) ---
+// --- API ROUTES (REPAIR & DEBUG MODE) ---
 app.post('/api/signup', async (req, res) => {
     try {
         const { username, password, email, phone } = req.body;
-        console.log(`📝 SIGNUP ATTEMPT: User "${username}"`);
+        console.log(`📝 SIGNUP ATTEMPT: ${username}`);
+
+        // DB Readiness Check
+        if (mongoose.connection.readyState !== 1) {
+            throw new Error("Database not connected. Check Atlas whitelist.");
+        }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({ username, password: hashedPassword, email, phone });
         
         await newUser.save();
-        console.log(`✅ SIGNUP SUCCESS: User "${username}" created.`);
+        console.log(`✅ SIGNUP SUCCESS: ${username}`);
         res.json({ success: true, message: "User created" });
     } catch (err) { 
         console.error("❌ SIGNUP ERROR:", err.message);
@@ -99,25 +104,31 @@ app.post('/api/signup', async (req, res) => {
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
-        console.log(`🔑 LOGIN ATTEMPT: User "${username}"`);
+        console.log(`🔑 LOGIN ATTEMPT: ${username}`);
+
+        // DB Readiness Check
+        if (mongoose.connection.readyState !== 1) {
+            throw new Error("Database not connected. Please wait 5 seconds and try again.");
+        }
+
         const user = await User.findOne({ username });
-        
         if (!user) {
-            console.warn(`⚠️ LOGIN FAIL: User "${username}" not found.`);
+            console.warn(`⚠️ LOGIN FAIL: ${username} not found.`);
             return res.status(401).json({ error: "Invalid username" });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            console.warn(`⚠️ LOGIN FAIL: Incorrect password for "${username}".`);
+            console.warn(`⚠️ LOGIN FAIL: Password wrong for ${username}.`);
             return res.status(401).json({ error: "Invalid password" });
         }
 
-        console.log(`✨ LOGIN SUCCESS: User "${username}" authenticated.`);
+        console.log(`✨ LOGIN SUCCESS: ${username}`);
         res.json({ message: "Access Granted", username: user.username });
     } catch (err) { 
         console.error("❌ LOGIN ERROR:", err.message);
-        res.status(500).json({ error: "Login error" }); 
+        // Sending the specific error back helps us debug Render
+        res.status(500).json({ error: err.message }); 
     }
 });
 
@@ -131,14 +142,14 @@ app.get('/api/chat/:user1/:user2', async (req, res) => {
             ]
         }).sort({ timestamp: 1 });
         res.json(messages);
-    } catch (err) { res.status(500).json({ error: "Fetch failed" }); }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(30);
         res.json(posts);
-    } catch (err) { res.status(500).json({ error: "Fetch failed" }); }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/search/:query', async (req, res) => {
@@ -160,9 +171,7 @@ io.on('connection', (socket) => {
         try {
             const { sender, receiver, content, type } = data;
             if (!content) return;
-
             const newMessage = await Message.create({ sender, receiver, content, type });
-            
             io.to(receiver).emit('receive_message', newMessage);
             io.to(sender).emit('receive_message', newMessage);
         } catch (err) { console.error("Socket Error:", err); }
