@@ -15,12 +15,11 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// INCREASE LIMIT: Crucial for permanent Base64 Profile Pictures and Posts
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// --- RENDER ROUTING FIX ---
+// --- RENDER ROUTING ---
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -77,30 +76,34 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// 1. DELETE POST (NEW ADDITION)
+// NEW: GET CHAT HISTORY (This fixes the "disappearing on refresh" problem)
+app.get('/api/messages/:user1/:user2', async (req, res) => {
+    try {
+        const { user1, user2 } = req.params;
+        const history = await Message.find({
+            $or: [
+                { sender: user1, receiver: user2 },
+                { sender: user2, receiver: user1 }
+            ]
+        }).sort({ timestamp: 1 }); 
+        res.json(history);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/posts/:id', async (req, res) => {
     try {
         const post = await Post.findById(req.params.id);
         if (!post) return res.status(404).json({ error: "Post not found" });
-        
-        // Only allow the sender to delete it
-        if (post.sender !== req.body.username) {
-            return res.status(403).json({ error: "Unauthorized" });
-        }
-
+        if (post.sender !== req.body.username) return res.status(403).json({ error: "Unauthorized" });
         await Post.findByIdAndDelete(req.params.id);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 2. FOLLOW / UNFOLLOW SYSTEM
 app.post('/api/follow', async (req, res) => {
     const { follower, target } = req.body; 
     try {
         const targetUser = await User.findOne({ username: target });
-        const me = await User.findOne({ username: follower });
-        if (!targetUser || !me) return res.status(404).json({ error: "User not found" });
-
         if (targetUser.followers.includes(follower)) {
             await User.findOneAndUpdate({ username: target }, { $pull: { followers: follower } });
             await User.findOneAndUpdate({ username: follower }, { $pull: { following: target } });
@@ -113,38 +116,14 @@ app.post('/api/follow', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 3. SETTINGS & PROFILE UPDATES
 app.post('/api/update-settings', async (req, res) => {
     try {
         const { username, settings } = req.body;
         await User.findOneAndUpdate({ username }, { settings: settings });
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Failed to update vault settings" }); }
+    } catch (err) { res.status(500).json({ error: "Failed update" }); }
 });
 
-app.post('/api/profile/:username/bio', async (req, res) => {
-    try {
-        await User.findOneAndUpdate({ username: req.params.username }, { bio: req.body.bio });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/profile/:username/pfp', async (req, res) => {
-    try {
-        await User.findOneAndUpdate({ username: req.params.username }, { profilePic: req.body.image });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.get('/api/profile/:username', async (req, res) => {
-    try {
-        const user = await User.findOne({ username: req.params.username }).select('-password');
-        if (!user) return res.status(404).json({ error: "Citizen not found" });
-        res.json(user);
-    } catch (err) { res.status(500).json({ error: "Profile retrieval error" }); }
-});
-
-// 4. POSTS API
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(50);
@@ -159,17 +138,15 @@ app.post('/api/posts', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Post failed." }); }
 });
 
-// 5. LIKES & COMMENTS
 app.post('/api/posts/:id/like', async (req, res) => {
-    const { username } = req.body;
     try {
         const post = await Post.findById(req.params.id);
-        const hasLiked = post.likedBy.includes(username);
+        const hasLiked = post.likedBy.includes(req.body.username);
         if (hasLiked) {
-            post.likedBy = post.likedBy.filter(u => u !== username);
+            post.likedBy = post.likedBy.filter(u => u !== req.body.username);
             post.likes = Math.max(0, post.likes - 1);
         } else {
-            post.likedBy.push(username);
+            post.likedBy.push(req.body.username);
             post.likes += 1;
         }
         await post.save();
@@ -177,25 +154,10 @@ app.post('/api/posts/:id/like', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/posts/:id/comment', async (req, res) => {
-    try {
-        const { user, text } = req.body;
-        const post = await Post.findByIdAndUpdate(
-            req.params.id,
-            { $push: { comments: { user, text } } },
-            { new: true }
-        );
-        res.json(post);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// 6. SEARCH & AUTH
 app.get('/api/search/:query', async (req, res) => {
     try {
-        const searchQuery = req.params.query;
-        if (!searchQuery || searchQuery === "undefined") return res.json([]);
         const users = await User.find({ 
-            username: { $regex: searchQuery, $options: 'i' } 
+            username: { $regex: req.params.query, $options: 'i' } 
         }).limit(10).select('username profilePic');
         res.json(users);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -206,7 +168,7 @@ app.post('/api/signup', async (req, res) => {
         const hashedPassword = await bcrypt.hash(req.body.password, 10);
         await User.create({ ...req.body, password: hashedPassword });
         res.json({ success: true });
-    } catch (err) { res.status(400).json({ error: "User already exists" }); }
+    } catch (err) { res.status(400).json({ error: "User exists" }); }
 });
 
 app.post('/api/login', async (req, res) => {
@@ -214,23 +176,31 @@ app.post('/api/login', async (req, res) => {
         const user = await User.findOne({ username: req.body.username });
         if (user && await bcrypt.compare(req.body.password, user.password)) {
             res.json({ message: "Access Granted", username: user.username, settings: user.settings });
-        } else { res.status(401).json({ error: "Invalid Credentials" }); }
+        } else { res.status(401).json({ error: "Invalid" }); }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
-    socket.on('join_private', (username) => socket.join(username));
+    // When a user opens the chat, they MUST join their own room to receive messages
+    socket.on('join_private', (username) => {
+        socket.join(username);
+        console.log(`👤 ${username} joined their private vault room.`);
+    });
     
     socket.on('send_message', async (data) => {
         try {
             const receiverDoc = await User.findOne({ username: data.receiver });
             if (receiverDoc && receiverDoc.blockedUsers.includes(data.sender)) return;
 
+            // 1. Save to Database first (So it stays forever)
             const newMessage = await Message.create(data);
+
+            // 2. Send to Receiver AND Sender (For multi-device sync)
             io.to(data.receiver).emit('receive_message', newMessage);
             io.to(data.sender).emit('receive_message', newMessage);
-        } catch (err) { console.error(err); }
+            
+        } catch (err) { console.error("Chat Error:", err); }
     });
 
     socket.on('send_like', (data) => {
