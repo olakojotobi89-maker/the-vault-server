@@ -13,7 +13,8 @@ const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] } 
 });
 
-// --- STEP 1: RENDER PORT BINDING (CRITICAL) ---
+// --- STEP 1: IMMEDIATE RENDER PORT BINDING ---
+// We bind the port at the top to satisfy Render's health check immediately.
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 VAULT SERVER ACTIVE ON PORT ${PORT}`);
@@ -71,21 +72,19 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// SIGNUP
 app.post('/api/signup', async (req, res) => {
     try {
         const { username, password, email, phone } = req.body;
-        if (mongoose.connection.readyState !== 1) throw new Error("Database connecting...");
+        if (mongoose.connection.readyState !== 1) throw new Error("Database is still connecting. Please wait 5 seconds.");
         const hashedPassword = await bcrypt.hash(password, 10);
         await User.create({ username, password: hashedPassword, email, phone });
         res.json({ success: true, message: "User created" });
     } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// LOGIN
 app.post('/api/login', async (req, res) => {
     try {
-        if (mongoose.connection.readyState !== 1) throw new Error("Database connecting...");
+        if (mongoose.connection.readyState !== 1) throw new Error("Database is still connecting. Please wait 5 seconds.");
         const user = await User.findOne({ username: req.body.username });
         if (user && await bcrypt.compare(req.body.password, user.password)) {
             res.json({ message: "Access Granted", username: user.username });
@@ -95,7 +94,6 @@ app.post('/api/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// SEARCH (RESTORED)
 app.get('/api/search/:query', async (req, res) => {
     try {
         const users = await User.find({ 
@@ -105,7 +103,6 @@ app.get('/api/search/:query', async (req, res) => {
     } catch (err) { res.json([]); }
 });
 
-// POSTS FEED (RESTORED)
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(30);
@@ -113,7 +110,6 @@ app.get('/api/posts', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// CHAT HISTORY
 app.get('/api/chat/:user1/:user2', async (req, res) => {
     try {
         const { user1, user2 } = req.params;
