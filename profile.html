@@ -72,7 +72,7 @@
         .stat-val { display: block; font-weight: 800; font-size: 18px; color: #fdbb2d; }
         .stat-label { font-size: 10px; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* --- RESTORED GRID FEED --- */
+        /* Grid Feed */
         .grid-feed {
             display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
             margin-top: 10px;
@@ -172,7 +172,6 @@
                     document.getElementById('pfp-target').innerText = profileUser.charAt(0).toUpperCase();
                 }
 
-                // UI buttons
                 if (profileUser === myName) {
                     document.getElementById('edit-btn').style.display = 'inline-block';
                     document.getElementById('pfp-hint').style.display = 'block';
@@ -190,31 +189,33 @@
         }
 
         async function loadPosts() {
-            const postRes = await fetch(`/api/posts/user/${profileUser}`);
-            const posts = await postRes.json();
-            const grid = document.getElementById('profile-grid');
-            grid.innerHTML = '';
-            
-            document.getElementById('count-posts').innerText = posts.length;
-            let likesCount = 0;
+            try {
+                const postRes = await fetch(`/api/posts/user/${profileUser}`);
+                const posts = await postRes.json();
+                const grid = document.getElementById('profile-grid');
+                grid.innerHTML = '';
+                
+                document.getElementById('count-posts').innerText = posts.length;
+                let totalLikes = 0;
 
-            posts.forEach(post => {
-                likesCount += (post.likes || 0);
-                const item = document.createElement('div');
-                item.className = 'grid-item';
-                item.onclick = () => openFullPost(post);
+                posts.forEach(post => {
+                    totalLikes += (post.likes || 0);
+                    const item = document.createElement('div');
+                    item.className = 'grid-item';
+                    item.onclick = () => openFullPost(post);
 
-                if (post.media) {
-                    const icon = post.type === 'video' ? '<i class="fas fa-play grid-icon"></i>' : '';
-                    item.innerHTML = post.type === 'video' 
-                        ? `${icon}<video src="${post.media}"></video>` 
-                        : `<img src="${post.media}">`;
-                } else {
-                    item.innerHTML = `<div class="grid-text">${post.caption.substring(0, 50)}...</div>`;
-                }
-                grid.appendChild(item);
-            });
-            document.getElementById('count-likes').innerText = likesCount;
+                    if (post.media) {
+                        const icon = post.type === 'video' ? '<i class="fas fa-play grid-icon"></i>' : '';
+                        item.innerHTML = post.type === 'video' 
+                            ? `${icon}<video src="${post.media}"></video>` 
+                            : `<img src="${post.media}">`;
+                    } else {
+                        item.innerHTML = `<div class="grid-text">${post.caption ? post.caption.substring(0, 30) : "Post"}...</div>`;
+                    }
+                    grid.appendChild(item);
+                });
+                document.getElementById('count-likes').innerText = totalLikes;
+            } catch (err) { console.error("Grid Load Error:", err); }
         }
 
         function openFullPost(post) {
@@ -238,7 +239,7 @@
                     <p style="margin-top:15px; font-size:15px; line-height:1.6; color: rgba(255,255,255,0.9);">${post.caption || ""}</p>
                     <div style="margin-top:15px; font-size:13px; display:flex; justify-content:space-between; align-items:center;">
                         <span><i class="fas fa-heart" style="color:#ff4b2b"></i> ${post.likes || 0} Likes</span>
-                        <span style="opacity:0.5;">${new Date(post.createdAt).toLocaleDateString()}</span>
+                        <span style="opacity:0.5;">${new Date(post.createdAt || Date.now()).toLocaleDateString()}</span>
                     </div>
                 </div>
             `;
@@ -247,7 +248,7 @@
 
         function closeModal() {
             document.getElementById('post-modal').style.display = 'none';
-            document.getElementById('modal-render').innerHTML = ''; // Stop video
+            document.getElementById('modal-render').innerHTML = ''; 
         }
 
         function toggleEdit() {
@@ -260,12 +261,14 @@
 
         async function saveBio() {
             const newBio = document.getElementById('edit-bio-input').value;
-            const res = await fetch(`/api/profile/${myName}/bio`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ bio: newBio })
-            });
-            if (res.ok) window.location.reload();
+            try {
+                const res = await fetch(`/api/profile/${myName}/bio`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bio: newBio })
+                });
+                if (res.ok) window.location.reload();
+            } catch(e) { alert("Save failed"); }
         }
 
         function triggerPfpUpload() {
@@ -288,12 +291,14 @@
         }
 
         async function handleFollow() {
-            const res = await fetch('/api/follow', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ follower: myName, target: profileUser })
-            });
-            if (res.ok) window.location.reload();
+            try {
+                const res = await fetch('/api/follow', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ follower: myName, target: profileUser })
+                });
+                if (res.ok) window.location.reload();
+            } catch(e) { console.error(e); }
         }
 
         initProfile();
