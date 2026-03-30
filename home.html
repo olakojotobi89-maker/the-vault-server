@@ -7,7 +7,6 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // Check if logged in
         if (!localStorage.getItem('vault_username')) {
             window.location.href = 'index.html';
         }
@@ -111,7 +110,7 @@
             <div class="nav-grid">
                 <a href="chat.html" class="nav-item chat-link"><i class="fas fa-comments"></i> <span>Open Private Chat</span></a>
                 <a id="my-profile-link" href="#" class="nav-item"><i class="fas fa-user-circle"></i> <span>My Profile</span></a>
-                <a href="settings.html" class="nav-item"><i class="fas fa-cog"></i> <span>Settings</span></a>
+                <a href="setting.html" class="nav-item"><i class="fas fa-cog"></i> <span>Settings</span></a>
                 <div onclick="logoutVault()" class="nav-item" style="grid-column: span 2; flex-direction: row; justify-content: center; background: rgba(255,0,0,0.1);">
                     <i class="fas fa-lock"></i> <span>Lock Vault</span>
                 </div>
@@ -220,6 +219,9 @@
                     feed.innerHTML = '<p style="text-align:center; opacity:0.5; margin-top:20px;">The Vault is empty.</p>';
                     return;
                 }
+
+                // Sorting to ensure newest is at the top, but they stay forever
+                posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
                 for (const post of posts) {
                     const postDiv = document.createElement('div');
