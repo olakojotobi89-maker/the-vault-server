@@ -113,9 +113,12 @@
         const username = document.getElementById('usernameInput').value;
         const password = document.getElementById('passwordInput').value;
 
+        // Use a relative URL to avoid CORS or port issues with VPNs
         const url = `/api/${type}`;
 
         try {
+            console.log(`📡 Sending ${type} request for:`, username);
+
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -123,26 +126,27 @@
             });
 
             const data = await response.json();
+            console.log("📥 Server Response:", data);
 
             if (response.ok) {
-                // Save session info
                 localStorage.setItem('vault_username', username);
-                
-                // REDIRECT FIXED: Now goes to home.html
                 window.location.href = 'home.html'; 
             } else {
-                alert("Error: " + data.error);
+                // If it's the specific "login error" message, it usually means 
+                // the server caught an error but didn't specify what.
+                alert("Vault Access Denied: " + (data.error || "Incorrect credentials"));
             }
         } catch (err) {
-            console.error(err);
-            alert("Connection Failed! Please try again in a moment.");
+            console.error("❌ Fetch Error:", err);
+            alert("Connection Failed! Ensure your Vault Server is active and VPN is connected.");
         }
     }
 
-    document.getElementById('loginForm').onsubmit = (e) => {
+    // Fixed the event listener to properly handle the async function
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        handleAuth('login');
-    };
+        await handleAuth('login');
+    });
     </script>
 
 </body>
