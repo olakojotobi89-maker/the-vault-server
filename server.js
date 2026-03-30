@@ -46,7 +46,7 @@ const Post = mongoose.model('Post', new mongoose.Schema({
     caption: String,
     media: String, 
     type: { type: String, default: 'image' }, 
-    likedBy: [{ type: String }], // Array of usernames who liked
+    likedBy: [{ type: String }],
     likes: { type: Number, default: 0 },
     comments: [{ 
         user: String, 
@@ -67,7 +67,39 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// 1. UPDATED POSTS API (Get all or specific user posts)
+// 1. FOLLOW / UNFOLLOW SYSTEM
+app.post('/api/follow', async (req, res) => {
+    const { follower, target } = req.body; // follower = me, target = user I want to follow
+    try {
+        const targetUser = await User.findOne({ username: target });
+        const me = await User.findOne({ username: follower });
+
+        if (!targetUser || !me) return res.status(404).json({ error: "User not found" });
+
+        if (targetUser.followers.includes(follower)) {
+            // UNFOLLOW LOGIC
+            await User.findOneAndUpdate({ username: target }, { $pull: { followers: follower } });
+            await User.findOneAndUpdate({ username: follower }, { $pull: { following: target } });
+            res.json({ success: true, action: "unfollowed" });
+        } else {
+            // FOLLOW LOGIC
+            await User.findOneAndUpdate({ username: target }, { $push: { followers: follower } });
+            await User.findOneAndUpdate({ username: follower }, { $push: { following: target } });
+            res.json({ success: true, action: "followed" });
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. SETTINGS UPDATE API
+app.post('/api/update-settings', async (req, res) => {
+    try {
+        const { username, settings } = req.body;
+        await User.findOneAndUpdate({ username }, { settings: settings });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: "Failed to update vault settings" }); }
+});
+
+// 3. POSTS API
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(50);
@@ -89,19 +121,16 @@ app.post('/api/posts', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Post failed." }); }
 });
 
-// 2. PERMANENT LIKES & COMMENTS
+// 4. LIKES & COMMENTS
 app.post('/api/posts/:id/like', async (req, res) => {
     const { username } = req.body;
     try {
         const post = await Post.findById(req.params.id);
         const hasLiked = post.likedBy.includes(username);
-
         if (hasLiked) {
-            // Unlike
             post.likedBy = post.likedBy.filter(u => u !== username);
             post.likes = Math.max(0, post.likes - 1);
         } else {
-            // Like
             post.likedBy.push(username);
             post.likes += 1;
         }
@@ -122,7 +151,7 @@ app.post('/api/posts/:id/comment', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 3. PROFILE UPDATES (Bio and Profile Picture)
+// 5. PROFILE UPDATES
 app.post('/api/profile/:username/bio', async (req, res) => {
     try {
         await User.findOneAndUpdate({ username: req.params.username }, { bio: req.body.bio });
@@ -145,7 +174,7 @@ app.get('/api/profile/:username', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Profile retrieval error" }); }
 });
 
-// SEARCH API
+// 6. SEARCH API
 app.get('/api/search/:query', async (req, res) => {
     try {
         const searchQuery = req.params.query;
@@ -157,7 +186,7 @@ app.get('/api/search/:query', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// AUTHENTICATION
+// 7. AUTHENTICATION
 app.post('/api/signup', async (req, res) => {
     try {
         const hashedPassword = await bcrypt.hash(req.body.password, 10);
@@ -191,7 +220,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('send_like', (data) => {
-        // Broadcast notification to the post owner
         io.to(data.owner).emit('receive_like', { sender: data.sender, owner: data.owner });
     });
 });
