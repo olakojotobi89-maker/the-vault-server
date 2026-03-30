@@ -13,6 +13,13 @@ const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] } 
 });
 
+// --- STEP 1: BIND PORT IMMEDIATELY ---
+// This tells Render the app is "Live" before it times out during DB connection
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 VAULT SERVER ACTIVE ON PORT ${PORT}`);
+});
+
 // Middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(cors());
@@ -32,12 +39,11 @@ app.get('/login.html', (req, res) => {
 });
 
 // --- MONGODB CONNECTION (SRV FORMAT) ---
-// Switched to the modern SRV string for better stability on Render/Cloud platforms
 const MONGO_URI = "mongodb+srv://olakojotobi89_db_user:VaultPass2026@cluster0.fuesl9b.mongodb.net/vaultDB?retryWrites=true&w=majority";
 
 mongoose.connect(MONGO_URI, {
-    serverSelectionTimeoutMS: 30000, // Wait 30 seconds before failing
-    socketTimeoutMS: 45000,         // Close sockets after 45 seconds of inactivity
+    serverSelectionTimeoutMS: 30000, 
+    socketTimeoutMS: 45000,
 })
     .then(() => console.log("🚀 VAULT DATABASE CONNECTED SUCCESSFULLY!"))
     .catch(err => {
@@ -183,9 +189,4 @@ io.on('connection', (socket) => {
             io.to(data.sender).emit('messages_viewed', { viewer: data.reader });
         } catch (err) { console.error("Mark Read Error:", err); }
     });
-});
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 VAULT SERVER ACTIVE ON PORT ${PORT}`);
 });
