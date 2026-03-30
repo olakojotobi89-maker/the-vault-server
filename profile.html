@@ -2,203 +2,264 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BBNT | Profile</title>
+
+    <script>
+        // Security Check
+        if (!localStorage.getItem('vault_username')) {
+            window.location.href = 'index.html';
+        }
+    </script>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root { --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); }
         body {
-            margin: 0; background: var(--primary-gradient); min-height: 100vh;
-            font-family: -apple-system, sans-serif; color: white; display: flex; justify-content: center;
+            margin: 0; padding: 20px 0; min-height: 100vh;
+            display: flex; justify-content: center;
+            background: var(--primary-gradient);
+            font-family: -apple-system, sans-serif; color: white;
         }
-        .profile-container { width: 100%; max-width: 500px; padding: 20px; box-sizing: border-box; }
+        .container { width: 95%; max-width: 500px; display: flex; flex-direction: column; gap: 20px; }
         .glass-card {
             background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px);
             border-radius: 30px; padding: 25px; border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 15px 35px rgba(0,0,0,0.3); margin-bottom: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
         }
-        
-        /* Header Section */
-        .profile-header { display: flex; align-items: center; gap: 20px; margin-bottom: 20px; }
+
+        /* Profile Header */
+        .header-box { text-align: center; position: relative; }
         .pfp-container {
-            width: 90px; height: 90px; background: #333; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 32px; border: 3px solid #fdbb2d; overflow: hidden; flex-shrink: 0;
+            width: 110px; height: 110px; border-radius: 50%; background: #333;
+            margin: 0 auto 15px; border: 3px solid #fdbb2d; overflow: hidden;
+            display: flex; align-items: center; justify-content: center; font-size: 40px;
+            cursor: pointer; position: relative;
         }
-        .stats-row { display: flex; gap: 20px; margin-top: 10px; }
-        .stat-item { text-align: center; flex: 1; }
-        .stat-num { font-weight: bold; font-size: 18px; display: block; }
-        .stat-label { font-size: 12px; opacity: 0.7; }
+        .pfp-container img { width: 100%; height: 100%; object-fit: cover; }
+        .pfp-overlay {
+            position: absolute; bottom: 0; background: rgba(0,0,0,0.6);
+            width: 100%; font-size: 11px; padding: 3px 0; display: none;
+        }
+        .pfp-container:hover .pfp-overlay { display: block; }
+
+        .user-title { font-size: 24px; font-weight: bold; margin-bottom: 8px; }
+        .bio-display { font-size: 14px; opacity: 0.8; line-height: 1.5; margin-bottom: 15px; }
+        
+        .edit-input {
+            width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px; color: white; padding: 10px; margin-bottom: 10px; 
+            display: none; font-family: inherit; resize: none;
+        }
 
         .action-btn {
-            width: 100%; background: white; color: #1a2a6c; border: none;
-            padding: 10px; border-radius: 12px; font-weight: bold; cursor: pointer;
-            margin-top: 15px; transition: 0.3s;
+            background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.1);
+            color: white; padding: 8px 20px; border-radius: 12px; cursor: pointer; transition: 0.3s;
         }
+        .action-btn:hover { background: rgba(255,255,255,0.25); }
 
-        /* Post Grid */
-        .feed-header { font-weight: bold; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .post-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
-        .grid-item { 
-            aspect-ratio: 1/1; background: rgba(0,0,0,0.2); border-radius: 8px; 
-            overflow: hidden; cursor: pointer;
+        /* Stats Row */
+        .stats { display: flex; justify-content: space-around; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
+        .stat-val { display: block; font-weight: bold; font-size: 18px; }
+        .stat-label { font-size: 11px; opacity: 0.6; text-transform: uppercase; }
+
+        /* Grid Feed */
+        .grid-feed {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+            margin-top: 10px;
+        }
+        .grid-item {
+            aspect-ratio: 1/1; background: rgba(0,0,0,0.2); border-radius: 12px;
+            overflow: hidden; cursor: pointer; border: 1px solid rgba(255,255,255,0.05);
         }
         .grid-item img, .grid-item video { width: 100%; height: 100%; object-fit: cover; }
-        .no-posts { grid-column: span 3; text-align: center; padding: 40px; opacity: 0.5; }
+        .grid-text { padding: 10px; font-size: 10px; opacity: 0.7; overflow: hidden; }
 
-        /* Modal styling */
-        #editModal input, #editModal textarea { width: 100%; box-sizing: border-box; }
+        /* Modal / Post Overlay */
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 10000; display: none;
+            justify-content: center; align-items: center; padding: 20px;
+        }
+        .modal-content { width: 100%; max-width: 450px; position: relative; }
+        .close-modal { position: absolute; top: -40px; right: 0; font-size: 30px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div class="profile-container">
-    <div class="glass-card">
-        <div style="margin-bottom: 15px;"><a href="home.html" style="color: white; text-decoration: none;"><i class="fas fa-arrow-left"></i> Back</a></div>
-        <div class="profile-header">
-            <div id="pfp" class="pfp-container"></div>
-            <div style="flex-grow: 1;">
-                <h2 id="profile-name" style="margin: 0;">Loading...</h2>
-                <div class="stats-row">
-                    <div class="stat-item"><span class="stat-num" id="count-posts">0</span><span class="stat-label">Posts</span></div>
-                    <div class="stat-item"><span class="stat-num" id="count-followers">0</span><span class="stat-label">Followers</span></div>
-                    <div class="stat-item"><span class="stat-num" id="count-following">0</span><span class="stat-label">Following</span></div>
-                </div>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <a href="home.html" style="color: white; text-decoration: none; font-size: 14px;">
+                <i class="fas fa-arrow-left"></i> Feed
+            </a>
+            <i class="fas fa-ellipsis-v" style="opacity: 0.5;"></i>
+        </div>
+
+        <div class="glass-card header-box">
+            <div class="pfp-container" onclick="triggerPfpUpload()">
+                <div id="pfp-target">?</div>
+                <div class="pfp-overlay" id="pfp-hint">Change</div>
+                <input type="file" id="pfp-file" accept="image/*" style="display:none" onchange="uploadPfp()">
             </div>
-        </div>
-        <p id="profile-bio" style="font-size: 14px; line-height: 1.5; margin: 0;"></p>
-        <button id="action-btn" class="action-btn">Follow</button>
-    </div>
 
-    <div class="glass-card">
-        <div class="feed-header">
-            <span><i class="fas fa-th"></i> Gallery</span>
-        </div>
-        <div id="user-posts" class="post-grid">
-            </div>
-    </div>
-</div>
-
-<div id="editModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); z-index: 2000; justify-content: center; align-items: center;">
-    <div class="glass-card" style="width: 90%; max-width: 400px; background: white; color: #333;">
-        <h3 style="margin-top: 0; color: #1a2a6c;">Edit Profile</h3>
-        <label style="font-size: 12px; font-weight: bold; display: block; margin-bottom: 5px;">Profile Picture</label>
-        <input type="file" id="edit-pfp-input" accept="image/*" style="margin-bottom: 15px;">
-        <label style="font-size: 12px; font-weight: bold; display: block; margin-bottom: 5px;">Bio</label>
-        <textarea id="edit-bio-input" placeholder="Tell the vault about yourself..." style="height: 80px; border-radius: 10px; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px; resize: none;"></textarea>
-        <div style="display: flex; gap: 10px;">
-            <button onclick="saveProfile()" id="save-btn" style="flex: 2; background: #1a2a6c; color: white; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer;">Save</button>
-            <button onclick="closeEditModal()" style="flex: 1; background: #eee; border: none; padding: 12px; border-radius: 10px; cursor: pointer;">Cancel</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const targetUser = urlParams.get('user');
-    const loggedInUser = localStorage.getItem('vault_username');
-    const actionBtn = document.getElementById('action-btn');
-    let currentProfileData = null;
-
-    async function loadProfile() {
-        if (!targetUser) return window.location.href = 'home.html';
-        
-        try {
-            // 1. Fetch User Info
-            const response = await fetch(`/api/profile/${targetUser}`);
-            currentProfileData = await response.json();
-
-            document.getElementById('profile-name').innerText = currentProfileData.username;
-            document.getElementById('profile-bio').innerText = currentProfileData.bio || "Vault citizen.";
+            <div class="user-title" id="display-username">Loading...</div>
+            <div class="bio-display" id="display-bio">Initializing vault...</div>
             
-            const pfpDiv = document.getElementById('pfp');
-            if (currentProfileData.profilePic) {
-                pfpDiv.innerHTML = `<img src="${currentProfileData.profilePic}" style="width:100%; height:100%; object-fit:cover;">`;
-            } else {
-                pfpDiv.innerText = currentProfileData.username.charAt(0).toUpperCase();
-            }
+            <textarea id="edit-bio-input" class="edit-input" placeholder="Update your bio..."></textarea>
+            
+            <div id="profile-controls">
+                <button id="edit-btn" class="action-btn" onclick="toggleEdit()" style="display:none">Edit Profile</button>
+                <button id="save-btn" class="action-btn" onclick="saveBio()" style="display:none; background: #fdbb2d; color: black;">Save Bio</button>
+            </div>
 
-            document.getElementById('count-followers').innerText = currentProfileData.followersCount || 0;
-            document.getElementById('count-following').innerText = currentProfileData.followingCount || 0;
+            <div class="stats">
+                <div class="stat-item"><span class="stat-val" id="count-posts">0</span><span class="stat-label">Posts</span></div>
+                <div class="stat-item"><span class="stat-val" id="count-likes">0</span><span class="stat-label">Likes</span></div>
+            </div>
+        </div>
 
-            // 2. Fetch only THIS user's posts
-            const postRes = await fetch(`/api/posts?user=${targetUser}`);
-            const posts = await postRes.json();
-            const grid = document.getElementById('user-posts');
-            document.getElementById('count-posts').innerText = posts.length;
+        <div class="grid-feed" id="profile-grid">
+            </div>
+    </div>
 
-            if (posts.length === 0) {
-                grid.innerHTML = '<div class="no-posts">No media vaulted yet.</div>';
-            } else {
-                grid.innerHTML = posts.map(post => {
-                    if (!post.media) return `<div class="grid-item" style="display:flex; align-items:center; padding:5px; font-size:10px;">${post.caption}</div>`;
-                    return `
-                        <div class="grid-item">
-                            ${post.type === 'video' ? `<video src="${post.media}"></video>` : `<img src="${post.media}">`}
-                        </div>
-                    `;
-                }).join('');
-            }
+    <div class="modal" id="post-modal" onclick="this.style.display='none'">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-modal" onclick="document.getElementById('post-modal').style.display='none'">&times;</span>
+            <div id="modal-render"></div>
+        </div>
+    </div>
 
-            // 3. Handle Action Button
-            if (targetUser === loggedInUser) {
-                actionBtn.innerText = "Edit Profile";
-                actionBtn.onclick = openEditModal;
-            } else {
-                actionBtn.innerText = "Follow";
-                // Add follow logic here later
-            }
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const profileUser = urlParams.get('user') || localStorage.getItem('vault_username');
+        const myName = localStorage.getItem('vault_username');
 
-        } catch (err) { console.error("Profile load failed:", err); }
-    }
+        async function initProfile() {
+            try {
+                // 1. Fetch User Info (Bio & PFP)
+                const userRes = await fetch(`/api/profile/${profileUser}`);
+                const userData = await userRes.json();
 
-    function openEditModal() {
-        document.getElementById('edit-bio-input').value = currentProfileData.bio || "";
-        document.getElementById('editModal').style.display = 'flex';
-    }
+                document.getElementById('display-username').innerText = profileUser;
+                document.getElementById('display-bio').innerText = userData.bio || "No bio yet.";
+                
+                if (userData.profilePic) {
+                    document.getElementById('pfp-target').innerHTML = `<img src="${userData.profilePic}">`;
+                } else {
+                    document.getElementById('pfp-target').innerText = profileUser.charAt(0).toUpperCase();
+                }
 
-    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
+                // Show Edit features only if owner
+                if (profileUser === myName) {
+                    document.getElementById('edit-btn').style.display = 'inline-block';
+                    document.getElementById('pfp-hint').style.display = 'block';
+                }
 
-    async function saveProfile() {
-        const btn = document.getElementById('save-btn');
-        const bio = document.getElementById('edit-bio-input').value;
-        const pfpFile = document.getElementById('edit-pfp-input').files[0];
-        
-        btn.innerText = "Saving...";
-        btn.disabled = true;
+                // 2. Fetch User Posts
+                const postRes = await fetch(`/api/posts/user/${profileUser}`);
+                const posts = await postRes.json();
+                const grid = document.getElementById('profile-grid');
+                grid.innerHTML = '';
+                document.getElementById('count-posts').innerText = posts.length;
 
-        let base64Image = currentProfileData.profilePic;
+                let totalLikes = 0;
 
-        if (pfpFile) {
-            base64Image = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.readAsDataURL(pfpFile);
-            });
+                posts.forEach(post => {
+                    totalLikes += (post.likes || 0);
+                    const item = document.createElement('div');
+                    item.className = 'grid-item';
+                    item.onclick = () => openFullPost(post);
+
+                    if (post.media) {
+                        item.innerHTML = post.type === 'video' 
+                            ? `<video src="${post.media}"></video>` 
+                            : `<img src="${post.media}">`;
+                    } else {
+                        item.innerHTML = `<div class="grid-text">${post.caption}</div>`;
+                    }
+                    grid.appendChild(item);
+                });
+
+                document.getElementById('count-likes').innerText = totalLikes;
+
+            } catch (err) { console.error("Error loading profile:", err); }
         }
 
-        try {
-            const res = await fetch('/api/update-profile', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    username: loggedInUser, 
-                    bio: bio, 
-                    profilePic: base64Image 
-                })
-            });
-            const result = await res.json();
-            if (result.success) {
-                location.reload();
-            } else {
-                alert("Error: " + result.error);
-                btn.innerText = "Save";
-                btn.disabled = false;
-            }
-        } catch (err) { alert("Server error"); }
-    }
+        // --- EDIT LOGIC ---
+        function toggleEdit() {
+            const bioText = document.getElementById('display-bio');
+            const bioInput = document.getElementById('edit-bio-input');
+            const saveBtn = document.getElementById('save-btn');
+            const editBtn = document.getElementById('edit-btn');
 
-    loadProfile();
-</script>
+            bioText.style.display = 'none';
+            bioInput.style.display = 'block';
+            bioInput.value = bioText.innerText;
+            saveBtn.style.display = 'inline-block';
+            editBtn.style.display = 'none';
+        }
+
+        async function saveBio() {
+            const newBio = document.getElementById('edit-bio-input').value;
+            try {
+                const res = await fetch(`/api/profile/${myName}/bio`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bio: newBio })
+                });
+                if (res.ok) window.location.reload();
+            } catch (err) { alert("Failed to save."); }
+        }
+
+        function triggerPfpUpload() {
+            if (profileUser === myName) document.getElementById('pfp-file').click();
+        }
+
+        async function uploadPfp() {
+            const file = document.getElementById('pfp-file').files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+                const base64 = reader.result;
+                const res = await fetch(`/api/profile/${myName}/pfp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64 })
+                });
+                if (res.ok) window.location.reload();
+            };
+        }
+
+        // --- POST MODAL LOGIC ---
+        function openFullPost(post) {
+            const modal = document.getElementById('post-modal');
+            const render = document.getElementById('modal-render');
+            
+            let mediaContent = '';
+            if (post.media) {
+                mediaContent = post.type === 'video' 
+                    ? `<video src="${post.media}" controls style="width:100%; border-radius:20px;"></video>` 
+                    : `<img src="${post.media}" style="width:100%; border-radius:20px;">`;
+            }
+
+            render.innerHTML = `
+                <div class="glass-card" style="padding:15px; background: rgba(0,0,0,0.8);">
+                    <div style="font-weight:bold; margin-bottom:12px; display:flex; align-items:center; gap:10px;">
+                        <i class="fas fa-user-circle"></i> ${post.sender}
+                    </div>
+                    ${mediaContent}
+                    <p style="margin-top:15px; font-size:15px; line-height:1.5;">${post.caption}</p>
+                    <div style="margin-top:15px; font-size:13px; opacity:0.6;">
+                        <i class="fas fa-heart" style="color:#ff4b2b"></i> ${post.likes || 0} Likes
+                    </div>
+                </div>
+            `;
+            modal.style.display = 'flex';
+        }
+
+        initProfile();
+    </script>
 </body>
 </html>
