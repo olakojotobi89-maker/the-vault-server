@@ -21,16 +21,14 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
 // --- RENDER ROUTING FIX ---
-// This ensures that even if you rename files, the server finds them.
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html')); // index is now your Login
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.get('/home', (req, res) => {
-    res.sendFile(path.join(__dirname, 'home.html')); // home is now your Feed
+    res.sendFile(path.join(__dirname, 'home.html'));
 });
 
-// Serve all other static files (CSS, JS, images)
 app.use(express.static(path.join(__dirname)));
 
 // --- MONGODB ---
@@ -79,7 +77,23 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// 1. FOLLOW / UNFOLLOW SYSTEM
+// 1. DELETE POST (NEW ADDITION)
+app.delete('/api/posts/:id', async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
+        if (!post) return res.status(404).json({ error: "Post not found" });
+        
+        // Only allow the sender to delete it
+        if (post.sender !== req.body.username) {
+            return res.status(403).json({ error: "Unauthorized" });
+        }
+
+        await Post.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. FOLLOW / UNFOLLOW SYSTEM
 app.post('/api/follow', async (req, res) => {
     const { follower, target } = req.body; 
     try {
@@ -99,7 +113,7 @@ app.post('/api/follow', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 2. SETTINGS UPDATE API
+// 3. SETTINGS & PROFILE UPDATES
 app.post('/api/update-settings', async (req, res) => {
     try {
         const { username, settings } = req.body;
@@ -108,17 +122,32 @@ app.post('/api/update-settings', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Failed to update vault settings" }); }
 });
 
-// 3. POSTS API
-app.get('/api/posts', async (req, res) => {
+app.post('/api/profile/:username/bio', async (req, res) => {
     try {
-        const posts = await Post.find().sort({ timestamp: -1 }).limit(50);
-        res.json(posts);
+        await User.findOneAndUpdate({ username: req.params.username }, { bio: req.body.bio });
+        res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/posts/user/:username', async (req, res) => {
+app.post('/api/profile/:username/pfp', async (req, res) => {
     try {
-        const posts = await Post.find({ sender: req.params.username }).sort({ timestamp: -1 });
+        await User.findOneAndUpdate({ username: req.params.username }, { profilePic: req.body.image });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/profile/:username', async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.username }).select('-password');
+        if (!user) return res.status(404).json({ error: "Citizen not found" });
+        res.json(user);
+    } catch (err) { res.status(500).json({ error: "Profile retrieval error" }); }
+});
+
+// 4. POSTS API
+app.get('/api/posts', async (req, res) => {
+    try {
+        const posts = await Post.find().sort({ timestamp: -1 }).limit(50);
         res.json(posts);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -130,7 +159,7 @@ app.post('/api/posts', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Post failed." }); }
 });
 
-// 4. LIKES & COMMENTS
+// 5. LIKES & COMMENTS
 app.post('/api/posts/:id/like', async (req, res) => {
     const { username } = req.body;
     try {
@@ -160,30 +189,7 @@ app.post('/api/posts/:id/comment', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 5. PROFILE UPDATES
-app.post('/api/profile/:username/bio', async (req, res) => {
-    try {
-        await User.findOneAndUpdate({ username: req.params.username }, { bio: req.body.bio });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/profile/:username/pfp', async (req, res) => {
-    try {
-        await User.findOneAndUpdate({ username: req.params.username }, { profilePic: req.body.image });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.get('/api/profile/:username', async (req, res) => {
-    try {
-        const user = await User.findOne({ username: req.params.username }).select('-password');
-        if (!user) return res.status(404).json({ error: "Citizen not found" });
-        res.json(user);
-    } catch (err) { res.status(500).json({ error: "Profile retrieval error" }); }
-});
-
-// 6. SEARCH API
+// 6. SEARCH & AUTH
 app.get('/api/search/:query', async (req, res) => {
     try {
         const searchQuery = req.params.query;
@@ -195,7 +201,6 @@ app.get('/api/search/:query', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 7. AUTHENTICATION
 app.post('/api/signup', async (req, res) => {
     try {
         const hashedPassword = await bcrypt.hash(req.body.password, 10);
