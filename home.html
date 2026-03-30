@@ -32,7 +32,6 @@
             box-shadow: 0 15px 35px rgba(0,0,0,0.3);
         }
         
-        /* Search Box Styles */
         .search-container { position: relative; margin-bottom: 20px; }
         .search-input {
             width: 100%; padding: 12px 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.2);
@@ -66,17 +65,16 @@
         .post-btn { background: #fdbb2d; border: none; padding: 8px 25px; border-radius: 12px; font-weight: bold; cursor: pointer; }
 
         #feed-display { display: flex; flex-direction: column; gap: 15px; }
-        .post { background: rgba(0, 0, 0, 0.25); border-radius: 20px; padding: 15px; transition: opacity 0.3s ease; }
+        .post { background: rgba(0, 0, 0, 0.25); border-radius: 20px; padding: 15px; transition: opacity 0.3s ease; border: 1px solid rgba(255,255,255,0.05); }
         .post-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
         .post-user-link { text-decoration: none; color: #00d2ff; font-weight: bold; display: flex; align-items: center; gap: 8px; }
         .mini-avatar { width: 32px; height: 32px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); }
-        .post-caption { margin-bottom: 10px; line-height: 1.4; }
-        .post-media { width: 100%; border-radius: 15px; margin-bottom: 10px; max-height: 400px; object-fit: cover; }
+        .post-caption { margin-bottom: 10px; line-height: 1.4; font-size: 14.5px; }
+        .post-media { width: 100%; border-radius: 15px; margin-bottom: 10px; max-height: 450px; object-fit: cover; }
         .post-actions { display: flex; gap: 20px; font-size: 13px; opacity: 0.8; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .delete-icon { cursor: pointer; color: rgba(255,255,255,0.4); font-size: 14px; padding: 5px; }
         .delete-icon:hover { color: #ff4b2b; }
 
-        /* Comment Section Styles */
         .comments-section { margin-top: 10px; }
         .comment-list { font-size: 13px; margin-bottom: 10px; max-height: 150px; overflow-y: auto; }
         .comment-item { margin-bottom: 5px; opacity: 0.9; }
@@ -84,11 +82,10 @@
         .comment-input-area { display: flex; gap: 10px; }
         .comment-input {
             flex: 1; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 10px; padding: 5px 10px; color: white; font-size: 13px; outline: none;
+            border-radius: 10px; padding: 8px 12px; color: white; font-size: 13px; outline: none;
         }
         .send-comment-btn { background: none; border: none; color: #00d2ff; cursor: pointer; font-size: 16px; }
 
-        /* Notification Toast Styling */
         .notification-toast {
             position: fixed; top: 20px; right: 20px;
             background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(15px);
@@ -103,7 +100,7 @@
 
     <div class="home-container">
         <div class="glass-card">
-            <h1 style="margin: 0; text-align: center;">BBNT</h1>
+            <h1 style="margin: 0; text-align: center; letter-spacing: 2px;">BBNT</h1>
             <p style="text-align: center; margin: 5px 0 0; font-size: 14px; opacity: 0.8;">
                 Welcome back, <span id="user-greeting" style="color: #fdbb2d; font-weight: bold;">User</span>
             </p>
@@ -145,7 +142,7 @@
     </div>
 
     <script>
-        const socket = io(); // Initialize Socket.io
+        const socket = io();
         const myName = localStorage.getItem('vault_username') || 'Guest';
         document.getElementById('user-greeting').innerText = myName;
         document.getElementById('my-profile-link').href = `profile.html?user=${myName}`;
@@ -157,7 +154,7 @@
             if (fileInput.files.length > 0) fileNameLabel.innerText = fileInput.files[0].name;
         };
 
-        // --- SOCKET LISTENER FOR LIKES ---
+        // Notification for Likes
         socket.on('receive_like', (data) => {
             if (data.owner === myName && data.sender !== myName) {
                 const toast = document.createElement('div');
@@ -168,50 +165,19 @@
             }
         });
 
-        async function loadFeed() {
-            try {
-                const response = await fetch('/api/posts');
-                const posts = await response.json();
-                const feed = document.getElementById('feed-display');
-                feed.innerHTML = ''; 
-
-                if (posts.length === 0) {
-                    feed.innerHTML = '<p style="text-align:center; opacity:0.5;">No posts yet. Be the first!</p>';
-                    return;
-                }
-
-                posts.forEach(post => {
-                    const postDiv = document.createElement('div');
-                    postDiv.className = 'post';
-                    postDiv.id = `post-${post._id}`;
-                    
-                    let mediaHTML = '';
-                    if (post.media) {
-                        mediaHTML = post.type === 'video' 
-                            ? `<video src="${post.media}" class="post-media" controls></video>` 
-                            : `<img src="${post.media}" class="post-media">`;
-                    }
-                    
-                    renderPostHTML(postDiv, post.sender, post.caption, mediaHTML, post._id, post.comments || []);
-                    feed.appendChild(postDiv);
-                });
-            } catch (err) {
-                console.error("Error loading feed:", err);
-            }
-        }
-
+        // 1. CREATE POST (Linked to Database)
         async function createPost() {
-            const caption = document.getElementById('post-caption').value;
+            const caption = document.getElementById('post-caption').value.trim();
             const file = fileInput.files[0];
             const postBtn = document.querySelector('.post-btn');
 
             if (!caption && !file) return;
 
-            postBtn.innerText = "Posting...";
+            postBtn.innerText = "Vaulting...";
             postBtn.disabled = true;
 
             let mediaBase64 = '';
-            let fileType = '';
+            let fileType = 'text';
 
             if (file) {
                 const reader = new FileReader();
@@ -239,20 +205,56 @@
                     document.getElementById('post-caption').value = '';
                     fileInput.value = '';
                     fileNameLabel.innerText = 'No file selected';
-                    loadFeed(); 
+                    loadFeed(); // Refresh feed immediately
+                } else {
+                    alert("Server error while posting.");
                 }
             } catch (err) {
-                alert("Post failed to upload.");
+                console.error(err);
+                alert("Check your connection.");
             } finally {
                 postBtn.innerText = "Post";
                 postBtn.disabled = false;
             }
         }
 
-        function renderPostHTML(container, sender, caption, media, postId, comments) {
-            const userInitial = sender.charAt(0).toUpperCase();
-            const deleteBtn = (sender === myName) ? `<i class="fas fa-trash-alt delete-icon" onclick="deletePost('${postId}')"></i>` : '';
+        // 2. LOAD FEED (Pulls from MongoDB)
+        async function loadFeed() {
+            try {
+                const response = await fetch('/api/posts');
+                const posts = await response.json();
+                const feed = document.getElementById('feed-display');
+                feed.innerHTML = ''; 
 
+                if (posts.length === 0) {
+                    feed.innerHTML = '<p style="text-align:center; opacity:0.5; margin-top:20px;">The Vault is empty.<br>Start the conversation!</p>';
+                    return;
+                }
+
+                posts.forEach(post => {
+                    const postDiv = document.createElement('div');
+                    postDiv.className = 'post';
+                    postDiv.id = `post-${post._id}`;
+                    
+                    let mediaHTML = '';
+                    if (post.media) {
+                        mediaHTML = post.type === 'video' 
+                            ? `<video src="${post.media}" class="post-media" controls></video>` 
+                            : `<img src="${post.media}" class="post-media" loading="lazy">`;
+                    }
+                    
+                    renderPostHTML(postDiv, post.sender, post.caption, mediaHTML, post._id, post.comments || [], post.likes || 0);
+                    feed.appendChild(postDiv);
+                });
+            } catch (err) {
+                console.error("Feed error:", err);
+            }
+        }
+
+        function renderPostHTML(container, sender, caption, media, postId, comments, likes) {
+            const userInitial = sender.charAt(0).toUpperCase();
+            const isMyPost = sender === myName;
+            
             const commentsHTML = comments.map(c => `
                 <div class="comment-item"><b>${c.user}:</b> ${c.text}</div>
             `).join('');
@@ -263,24 +265,41 @@
                         <div class="mini-avatar">${userInitial}</div>
                         <span>${sender}</span>
                     </a>
-                    ${deleteBtn}
+                    ${isMyPost ? `<i class="fas fa-trash-alt delete-icon" onclick="deletePost('${postId}')"></i>` : ''}
                 </div>
                 ${media}
                 <div class="post-caption"><b>${sender}</b> ${caption}</div>
                 <div class="post-actions">
-                    <span onclick="handleLike(this, '${sender}')" style="cursor:pointer;"><i class="far fa-heart"></i> <span class="like-count">0</span></span>
+                    <span onclick="handleLike(this, '${postId}', '${sender}')" style="cursor:pointer;"><i class="far fa-heart"></i> <span class="like-count">${likes}</span></span>
                     <span style="cursor:pointer;"><i class="far fa-comment"></i> ${comments.length}</span>
                 </div>
                 <div class="comments-section">
-                    <div class="comment-list" id="comment-list-${postId}">${commentsHTML}</div>
+                    <div class="comment-list">${commentsHTML}</div>
                     <div class="comment-input-area">
-                        <input type="text" class="comment-input" id="input-${postId}" placeholder="Write a comment...">
+                        <input type="text" class="comment-input" id="input-${postId}" placeholder="Add a comment...">
                         <button class="send-comment-btn" onclick="submitComment('${postId}')"><i class="fas fa-paper-plane"></i></button>
                     </div>
                 </div>
             `;
         }
 
+        // 3. DELETE POST
+        async function deletePost(postId) {
+            if (!confirm("Are you sure? This cannot be undone.")) return;
+            try {
+                const response = await fetch(`/api/posts/${postId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: myName })
+                });
+                if (response.ok) {
+                    document.getElementById(`post-${postId}`).style.opacity = '0';
+                    setTimeout(() => document.getElementById(`post-${postId}`).remove(), 3000);
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        // 4. COMMENTS & SEARCH
         async function submitComment(postId) {
             const input = document.getElementById(`input-${postId}`);
             const text = input.value.trim();
@@ -292,30 +311,11 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ user: myName, text: text })
                 });
-
                 if (response.ok) {
                     input.value = '';
                     loadFeed(); 
                 }
-            } catch (err) {
-                console.error("Comment failed:", err);
-            }
-        }
-
-        async function deletePost(postId) {
-            if (!confirm("Delete this post forever?")) return;
-            try {
-                const response = await fetch(`/api/posts/${postId}`, {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: myName })
-                });
-                if (response.ok) {
-                    document.getElementById(`post-${postId}`).remove();
-                }
-            } catch (err) {
-                console.error("Error deleting:", err);
-            }
+            } catch (err) { console.error(err); }
         }
 
         async function searchUsers(query) {
@@ -331,10 +331,10 @@
                         <span>${user.username}</span>
                     </a>
                 `).join('');
-            } catch (err) { console.error("Search failed:", err); }
+            } catch (err) { console.error(err); }
         }
 
-        function handleLike(btn, postOwner) {
+        function handleLike(btn, postId, postOwner) {
             const icon = btn.querySelector('i');
             const countSpan = btn.querySelector('.like-count');
             let count = parseInt(countSpan.innerText);
@@ -343,12 +343,7 @@
                 icon.classList.replace('far', 'fas');
                 icon.style.color = "#ff4b2b";
                 countSpan.innerText = count + 1;
-
-                // Send real-time notification via socket
-                socket.emit('send_like', {
-                    sender: myName,
-                    owner: postOwner
-                });
+                socket.emit('send_like', { sender: myName, owner: postOwner });
             } else {
                 icon.classList.replace('fas', 'far');
                 icon.style.color = "white";
