@@ -1,3 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vault Settings | BBNT</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
 <body>
 
     <div class="settings-card">
@@ -53,7 +62,8 @@
                 const res = await fetch(`/api/profile/${loggedInUser}`);
                 const data = await res.json();
 
-                if (data.settings) {
+                // Check if user and settings exist
+                if (data && data.settings) {
                     document.getElementById('setting-private').checked = data.settings.privateAccount || false;
                     document.getElementById('setting-darkmode').checked = data.settings.darkMode || false;
                     document.getElementById('setting-notifications').checked = data.settings.notifications || false;
@@ -66,6 +76,8 @@
         // 2. Save settings to the database
         async function saveSettings() {
             const btn = document.getElementById('save-settings-btn');
+            const originalText = "Update Vault";
+            
             btn.innerText = "Syncing with Vault...";
             btn.disabled = true;
 
@@ -88,15 +100,19 @@
                 const result = await res.json();
                 if (result.success) {
                     btn.innerText = "Vault Updated!";
-                    btn.style.background = "#00ff88";
+                    btn.style.background = "#ffd700"; // Gold accent for success
+                    btn.style.color = "#000";
+                    
                     setTimeout(() => {
-                        btn.innerText = "Update Vault";
-                        btn.style.background = "white";
+                        btn.innerText = originalText;
+                        btn.style.background = ""; // Reverts to CSS default
+                        btn.style.color = "";
                         btn.disabled = false;
                     }, 2000);
                 }
             } catch (err) {
                 alert("Vault Sync Error");
+                btn.innerText = originalText;
                 btn.disabled = false;
             }
         }
@@ -105,3 +121,4 @@
         loadSettings();
     </script>
 </body>
+</html>
