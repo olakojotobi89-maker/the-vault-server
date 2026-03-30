@@ -2,28 +2,33 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BBNT | Profile</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Vault | Profile</title>
 
     <script>
-        // Security Check
         if (!localStorage.getItem('vault_username')) {
             window.location.href = 'index.html';
         }
     </script>
 
-    <link rel="stylesheet" href="/style.css"> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root { --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); }
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
         body {
-            margin: 0; padding: 20px 0; min-height: 100vh;
+            margin: 0; padding: 20px 0; min-height: 100dvh;
             display: flex; justify-content: center;
             background: var(--primary-gradient);
             font-family: -apple-system, sans-serif; color: white;
+            overflow-x: hidden;
         }
-        .container { width: 95%; max-width: 500px; display: flex; flex-direction: column; gap: 20px; }
+        
+        .container { width: 95%; max-width: 500px; display: flex; flex-direction: column; gap: 20px; padding-bottom: 40px; }
+        
         .glass-card {
-            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(25px);
             border-radius: 30px; padding: 25px; border: 1px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 15px 35px rgba(0,0,0,0.3);
         }
@@ -31,31 +36,31 @@
         /* Profile Header */
         .header-box { text-align: center; position: relative; }
         .pfp-container {
-            width: 110px; height: 110px; border-radius: 50%; background: #333;
+            width: 110px; height: 110px; border-radius: 50%; background: #222;
             margin: 0 auto 15px; border: 3px solid #fdbb2d; overflow: hidden;
             display: flex; align-items: center; justify-content: center; font-size: 40px;
             cursor: pointer; position: relative;
         }
         .pfp-container img { width: 100%; height: 100%; object-fit: cover; }
         .pfp-overlay {
-            position: absolute; bottom: 0; background: rgba(0,0,0,0.6);
-            width: 100%; font-size: 11px; padding: 3px 0; display: none;
+            position: absolute; bottom: 0; background: rgba(0,0,0,0.7);
+            width: 100%; font-size: 11px; padding: 4px 0; display: none;
         }
         .pfp-container:hover .pfp-overlay { display: block; }
 
         .user-title { font-size: 24px; font-weight: bold; margin-bottom: 8px; }
-        .bio-display { font-size: 14px; opacity: 0.8; line-height: 1.5; margin-bottom: 15px; }
+        .bio-display { font-size: 14px; opacity: 0.8; line-height: 1.5; margin-bottom: 15px; padding: 0 10px; }
         
         .edit-input {
-            width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 12px; color: white; padding: 10px; margin-bottom: 10px; 
-            display: none; font-family: inherit; resize: none;
+            width: 100%; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px; color: white; padding: 12px; margin-bottom: 15px; 
+            display: none; font-family: inherit; resize: none; font-size: 14px;
         }
 
         .action-btn {
             background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.1);
-            color: white; padding: 8px 20px; border-radius: 12px; cursor: pointer; transition: 0.3s;
-            font-weight: 600;
+            color: white; padding: 10px 24px; border-radius: 15px; cursor: pointer; transition: 0.3s;
+            font-weight: 600; font-size: 14px;
         }
         .action-btn:hover { background: rgba(255,255,255,0.25); }
         .follow-btn { background: #fdbb2d; color: black; border: none; }
@@ -63,58 +68,69 @@
 
         /* Stats Row */
         .stats { display: flex; justify-content: space-around; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
-        .stat-item { text-align: center; cursor: pointer; }
-        .stat-val { display: block; font-weight: bold; font-size: 18px; }
-        .stat-label { font-size: 11px; opacity: 0.6; text-transform: uppercase; }
+        .stat-item { text-align: center; }
+        .stat-val { display: block; font-weight: 800; font-size: 18px; color: #fdbb2d; }
+        .stat-label { font-size: 10px; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* Grid Feed */
+        /* --- RESTORED GRID FEED --- */
         .grid-feed {
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
             margin-top: 10px;
         }
         .grid-item {
-            aspect-ratio: 1/1; background: rgba(0,0,0,0.2); border-radius: 12px;
-            overflow: hidden; cursor: pointer; border: 1px solid rgba(255,255,255,0.05);
+            aspect-ratio: 1/1; background: rgba(0,0,0,0.3); border-radius: 8px;
+            overflow: hidden; cursor: pointer; position: relative;
+            border: 1px solid rgba(255,255,255,0.05);
         }
         .grid-item img, .grid-item video { width: 100%; height: 100%; object-fit: cover; }
-        .grid-text { padding: 10px; font-size: 10px; opacity: 0.7; overflow: hidden; }
-
-        /* Modal / Post Overlay */
-        .modal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 10000; display: none;
-            justify-content: center; align-items: center; padding: 20px;
+        .grid-text { 
+            padding: 10px; font-size: 9px; opacity: 0.8; height: 100%; 
+            display: flex; align-items: center; justify-content: center; text-align: center;
         }
-        .modal-content { width: 100%; max-width: 450px; position: relative; }
-        .close-modal { position: absolute; top: -40px; right: 0; font-size: 30px; cursor: pointer; }
+        .grid-icon {
+            position: absolute; top: 5px; right: 5px; font-size: 12px; color: white;
+            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        /* Modal View */
+        .modal {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.9); z-index: 9999; display: none;
+            justify-content: center; align-items: center; padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .modal-content { width: 100%; max-width: 450px; position: relative; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .close-modal { position: absolute; top: -45px; right: 0; font-size: 35px; color: white; cursor: pointer; }
+
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <a href="home.html" style="color: white; text-decoration: none; font-size: 14px;">
-                <i class="fas fa-arrow-left"></i> Feed
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 10px;">
+            <a href="home.html" style="color: white; text-decoration: none; font-size: 14px; font-weight: 500;">
+                <i class="fas fa-chevron-left"></i> Feed
             </a>
-            <a href="setting.html" style="color: white; opacity: 0.7;"><i class="fas fa-cog"></i></a>
+            <a href="setting.html" style="color: white; opacity: 0.8;"><i class="fas fa-ellipsis-v"></i></a>
         </div>
 
         <div class="glass-card header-box">
             <div class="pfp-container" onclick="triggerPfpUpload()">
-                <div id="pfp-target">?</div>
-                <div class="pfp-overlay" id="pfp-hint">Change</div>
+                <div id="pfp-target"><i class="fas fa-user"></i></div>
+                <div class="pfp-overlay" id="pfp-hint">Change Photo</div>
                 <input type="file" id="pfp-file" accept="image/*" style="display:none" onchange="uploadPfp()">
             </div>
 
-            <div class="user-title" id="display-username">Loading...</div>
-            <div class="bio-display" id="display-bio">Initializing vault...</div>
+            <div class="user-title" id="display-username">@username</div>
+            <div class="bio-display" id="display-bio">...</div>
             
-            <textarea id="edit-bio-input" class="edit-input" placeholder="Update your bio..."></textarea>
+            <textarea id="edit-bio-input" class="edit-input" placeholder="What's on your mind?"></textarea>
             
             <div id="profile-controls">
                 <button id="edit-btn" class="action-btn" onclick="toggleEdit()" style="display:none">Edit Profile</button>
                 <button id="follow-btn" class="action-btn follow-btn" onclick="handleFollow()" style="display:none">Follow</button>
-                <button id="save-btn" class="action-btn" onclick="saveBio()" style="display:none; background: #fdbb2d; color: black;">Save Bio</button>
+                <button id="save-btn" class="action-btn" onclick="saveBio()" style="display:none; background: #fdbb2d; color: black;">Save Changes</button>
             </div>
 
             <div class="stats">
@@ -128,9 +144,9 @@
         <div class="grid-feed" id="profile-grid"></div>
     </div>
 
-    <div class="modal" id="post-modal" onclick="this.style.display='none'">
+    <div class="modal" id="post-modal" onclick="closeModal()">
         <div class="modal-content" onclick="event.stopPropagation()">
-            <span class="close-modal" onclick="document.getElementById('post-modal').style.display='none'">&times;</span>
+            <span class="close-modal" onclick="closeModal()">&times;</span>
             <div id="modal-render"></div>
         </div>
     </div>
@@ -139,17 +155,14 @@
         const urlParams = new URLSearchParams(window.location.search);
         const profileUser = urlParams.get('user') || localStorage.getItem('vault_username');
         const myName = localStorage.getItem('vault_username');
-        let isFollowing = false;
 
         async function initProfile() {
             try {
                 const userRes = await fetch(`/api/profile/${profileUser}`);
                 const userData = await userRes.json();
 
-                document.getElementById('display-username').innerText = profileUser;
+                document.getElementById('display-username').innerText = `@${profileUser}`;
                 document.getElementById('display-bio').innerText = userData.bio || "No bio yet.";
-                
-                // Set Stats
                 document.getElementById('count-followers').innerText = userData.followers ? userData.followers.length : 0;
                 document.getElementById('count-following').innerText = userData.following ? userData.following.length : 0;
 
@@ -159,95 +172,100 @@
                     document.getElementById('pfp-target').innerText = profileUser.charAt(0).toUpperCase();
                 }
 
-                // Logic for Follow vs Edit Button
-                const followBtn = document.getElementById('follow-btn');
-                const editBtn = document.getElementById('edit-btn');
-
+                // UI buttons
                 if (profileUser === myName) {
-                    editBtn.style.display = 'inline-block';
+                    document.getElementById('edit-btn').style.display = 'inline-block';
                     document.getElementById('pfp-hint').style.display = 'block';
                 } else {
-                    followBtn.style.display = 'inline-block';
-                    // Check if already following
+                    const fBtn = document.getElementById('follow-btn');
+                    fBtn.style.display = 'inline-block';
                     if (userData.followers && userData.followers.includes(myName)) {
-                        isFollowing = true;
-                        followBtn.innerText = "Following";
-                        followBtn.classList.add('following');
+                        fBtn.innerText = "Following";
+                        fBtn.classList.add('following');
                     }
                 }
 
-                const postRes = await fetch(`/api/posts/user/${profileUser}`);
-                const posts = await postRes.json();
-                const grid = document.getElementById('profile-grid');
-                grid.innerHTML = '';
-                document.getElementById('count-posts').innerText = posts.length;
-
-                let totalLikes = 0;
-                posts.forEach(post => {
-                    totalLikes += (post.likes || 0);
-                    const item = document.createElement('div');
-                    item.className = 'grid-item';
-                    item.onclick = () => openFullPost(post);
-                    if (post.media) {
-                        item.innerHTML = post.type === 'video' 
-                            ? `<video src="${post.media}"></video>` 
-                            : `<img src="${post.media}">`;
-                    } else {
-                        item.innerHTML = `<div class="grid-text">${post.caption}</div>`;
-                    }
-                    grid.appendChild(item);
-                });
-                document.getElementById('count-likes').innerText = totalLikes;
-
-            } catch (err) { console.error("Error loading profile:", err); }
+                loadPosts();
+            } catch (err) { console.error(err); }
         }
 
-        async function handleFollow() {
-            const btn = document.getElementById('follow-btn');
-            btn.disabled = true;
+        async function loadPosts() {
+            const postRes = await fetch(`/api/posts/user/${profileUser}`);
+            const posts = await postRes.json();
+            const grid = document.getElementById('profile-grid');
+            grid.innerHTML = '';
+            
+            document.getElementById('count-posts').innerText = posts.length;
+            let likesCount = 0;
 
-            try {
-                const res = await fetch('/api/follow', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        follower: myName, 
-                        target: profileUser 
-                    })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    window.location.reload(); // Refresh to update counts
+            posts.forEach(post => {
+                likesCount += (post.likes || 0);
+                const item = document.createElement('div');
+                item.className = 'grid-item';
+                item.onclick = () => openFullPost(post);
+
+                if (post.media) {
+                    const icon = post.type === 'video' ? '<i class="fas fa-play grid-icon"></i>' : '';
+                    item.innerHTML = post.type === 'video' 
+                        ? `${icon}<video src="${post.media}"></video>` 
+                        : `<img src="${post.media}">`;
+                } else {
+                    item.innerHTML = `<div class="grid-text">${post.caption.substring(0, 50)}...</div>`;
                 }
-            } catch (err) {
-                console.error("Follow error:", err);
-                btn.disabled = false;
+                grid.appendChild(item);
+            });
+            document.getElementById('count-likes').innerText = likesCount;
+        }
+
+        function openFullPost(post) {
+            const modal = document.getElementById('post-modal');
+            const render = document.getElementById('modal-render');
+            let mediaHtml = '';
+            
+            if (post.media) {
+                mediaHtml = post.type === 'video' 
+                    ? `<video src="${post.media}" controls autoplay style="width:100%; border-radius:20px;"></video>` 
+                    : `<img src="${post.media}" style="width:100%; border-radius:20px;">`;
             }
+
+            render.innerHTML = `
+                <div class="glass-card" style="padding:20px; background: rgba(0,0,0,0.85); border: 1px solid rgba(255,255,255,0.1);">
+                    <div style="font-weight:bold; margin-bottom:15px; display:flex; align-items:center; gap:10px;">
+                        <div style="width:30px; height:30px; border-radius:50%; background:#fdbb2d; color:black; display:flex; align-items:center; justify-content:center; font-size:12px;">${post.sender[0].toUpperCase()}</div>
+                        ${post.sender}
+                    </div>
+                    ${mediaHtml}
+                    <p style="margin-top:15px; font-size:15px; line-height:1.6; color: rgba(255,255,255,0.9);">${post.caption || ""}</p>
+                    <div style="margin-top:15px; font-size:13px; display:flex; justify-content:space-between; align-items:center;">
+                        <span><i class="fas fa-heart" style="color:#ff4b2b"></i> ${post.likes || 0} Likes</span>
+                        <span style="opacity:0.5;">${new Date(post.createdAt).toLocaleDateString()}</span>
+                    </div>
+                </div>
+            `;
+            modal.style.display = 'flex';
         }
 
-        // Existing functions (toggleEdit, saveBio, uploadPfp, openFullPost) remain the same...
+        function closeModal() {
+            document.getElementById('post-modal').style.display = 'none';
+            document.getElementById('modal-render').innerHTML = ''; // Stop video
+        }
+
         function toggleEdit() {
-            const bioText = document.getElementById('display-bio');
-            const bioInput = document.getElementById('edit-bio-input');
-            const saveBtn = document.getElementById('save-btn');
-            const editBtn = document.getElementById('edit-btn');
-            bioText.style.display = 'none';
-            bioInput.style.display = 'block';
-            bioInput.value = bioText.innerText;
-            saveBtn.style.display = 'inline-block';
-            editBtn.style.display = 'none';
+            document.getElementById('display-bio').style.display = 'none';
+            document.getElementById('edit-bio-input').style.display = 'block';
+            document.getElementById('edit-bio-input').value = document.getElementById('display-bio').innerText;
+            document.getElementById('save-btn').style.display = 'inline-block';
+            document.getElementById('edit-btn').style.display = 'none';
         }
 
         async function saveBio() {
             const newBio = document.getElementById('edit-bio-input').value;
-            try {
-                const res = await fetch(`/api/profile/${myName}/bio`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ bio: newBio })
-                });
-                if (res.ok) window.location.reload();
-            } catch (err) { alert("Failed to save."); }
+            const res = await fetch(`/api/profile/${myName}/bio`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bio: newBio })
+            });
+            if (res.ok) window.location.reload();
         }
 
         function triggerPfpUpload() {
@@ -260,38 +278,22 @@
             const reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onload = async () => {
-                const base64 = reader.result;
                 const res = await fetch(`/api/profile/${myName}/pfp`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: base64 })
+                    body: JSON.stringify({ image: reader.result })
                 });
                 if (res.ok) window.location.reload();
             };
         }
 
-        function openFullPost(post) {
-            const modal = document.getElementById('post-modal');
-            const render = document.getElementById('modal-render');
-            let mediaContent = '';
-            if (post.media) {
-                mediaContent = post.type === 'video' 
-                    ? `<video src="${post.media}" controls style="width:100%; border-radius:20px;"></video>` 
-                    : `<img src="${post.media}" style="width:100%; border-radius:20px;">`;
-            }
-            render.innerHTML = `
-                <div class="glass-card" style="padding:15px; background: rgba(0,0,0,0.8);">
-                    <div style="font-weight:bold; margin-bottom:12px; display:flex; align-items:center; gap:10px;">
-                        <i class="fas fa-user-circle"></i> ${post.sender}
-                    </div>
-                    ${mediaContent}
-                    <p style="margin-top:15px; font-size:15px; line-height:1.5;">${post.caption}</p>
-                    <div style="margin-top:15px; font-size:13px; opacity:0.6;">
-                        <i class="fas fa-heart" style="color:#ff4b2b"></i> ${post.likes || 0} Likes
-                    </div>
-                </div>
-            `;
-            modal.style.display = 'flex';
+        async function handleFollow() {
+            const res = await fetch('/api/follow', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ follower: myName, target: profileUser })
+            });
+            if (res.ok) window.location.reload();
         }
 
         initProfile();
