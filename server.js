@@ -19,8 +19,6 @@ app.use(cors());
 app.use(express.static(path.join(__dirname)));
 
 // --- FIXED ROUTES ---
-// This ensures that whether the browser asks for /, /login, or /login.html, 
-// it correctly serves your index.html file.
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -80,30 +78,47 @@ const Message = mongoose.model('Message', new mongoose.Schema({
     seen: { type: Boolean, default: false }
 }));
 
-// --- API ROUTES ---
+// --- API ROUTES (DEBUG ENABLED) ---
 app.post('/api/signup', async (req, res) => {
     try {
         const { username, password, email, phone } = req.body;
+        console.log(`📝 SIGNUP ATTEMPT: User "${username}"`);
+
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({ username, password: hashedPassword, email, phone });
+        
         await newUser.save();
+        console.log(`✅ SIGNUP SUCCESS: User "${username}" created.`);
         res.json({ success: true, message: "User created" });
     } catch (err) { 
-        res.status(400).json({ error: "Username might already exist" }); 
+        console.error("❌ SIGNUP ERROR:", err.message);
+        res.status(400).json({ error: err.message }); 
     }
 });
 
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
+        console.log(`🔑 LOGIN ATTEMPT: User "${username}"`);
         const user = await User.findOne({ username });
-        if (!user) return res.status(401).json({ error: "Invalid username" });
+        
+        if (!user) {
+            console.warn(`⚠️ LOGIN FAIL: User "${username}" not found.`);
+            return res.status(401).json({ error: "Invalid username" });
+        }
 
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(401).json({ error: "Invalid password" });
+        if (!isMatch) {
+            console.warn(`⚠️ LOGIN FAIL: Incorrect password for "${username}".`);
+            return res.status(401).json({ error: "Invalid password" });
+        }
 
+        console.log(`✨ LOGIN SUCCESS: User "${username}" authenticated.`);
         res.json({ message: "Access Granted", username: user.username });
-    } catch (err) { res.status(500).json({ error: "Login error" }); }
+    } catch (err) { 
+        console.error("❌ LOGIN ERROR:", err.message);
+        res.status(500).json({ error: "Login error" }); 
+    }
 });
 
 app.get('/api/chat/:user1/:user2', async (req, res) => {
