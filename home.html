@@ -155,7 +155,6 @@
             if (fileInput.files.length > 0) fileNameLabel.innerText = fileInput.files[0].name;
         };
 
-        // Notification for Likes
         socket.on('receive_like', (data) => {
             if (data.owner === myName && data.sender !== myName) {
                 const toast = document.createElement('div');
@@ -166,7 +165,6 @@
             }
         });
 
-        // 1. CREATE POST
         async function createPost() {
             const caption = document.getElementById('post-caption').value.trim();
             const file = fileInput.files[0];
@@ -193,12 +191,7 @@
                 const response = await fetch('/api/posts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        sender: myName,
-                        caption: caption,
-                        media: mediaBase64,
-                        type: fileType
-                    })
+                    body: JSON.stringify({ sender: myName, caption, media: mediaBase64, type: fileType })
                 });
 
                 if (response.ok) {
@@ -206,17 +199,14 @@
                     fileInput.value = '';
                     fileNameLabel.innerText = 'No file selected';
                     loadFeed(); 
-                } else {
-                    alert("Post too large or server error.");
                 }
-            } catch (err) { alert("Check your connection."); }
+            } catch (err) { alert("Connection error."); }
             finally {
                 postBtn.innerText = "Post";
                 postBtn.disabled = false;
             }
         }
 
-        // 2. LOAD FEED
         async function loadFeed() {
             try {
                 const response = await fetch('/api/posts');
@@ -232,15 +222,10 @@
                 for (const post of posts) {
                     const postDiv = document.createElement('div');
                     postDiv.className = 'post';
-                    postDiv.id = `post-${post._id}`;
                     
-                    // Fetch sender profile data for the avatar
                     const userRes = await fetch(`/api/profile/${post.sender}`);
                     const userData = await userRes.json();
-                    
-                    const avatarHTML = userData.profilePic ? 
-                        `<img src="${userData.profilePic}">` : 
-                        post.sender.charAt(0).toUpperCase();
+                    const avatarHTML = userData.profilePic ? `<img src="${userData.profilePic}">` : post.sender.charAt(0).toUpperCase();
 
                     let mediaHTML = '';
                     if (post.media) {
@@ -253,6 +238,11 @@
                         <div class="comment-item"><b>${c.user}:</b> ${c.text}</div>
                     `).join('');
 
+                    // Logic to check if I have liked this post
+                    const isLiked = (post.likedBy || []).includes(myName);
+                    const heartClass = isLiked ? 'fas fa-heart' : 'far fa-heart';
+                    const heartColor = isLiked ? '#ff4b2b' : 'white';
+
                     postDiv.innerHTML = `
                         <div class="post-header">
                             <a href="profile.html?user=${post.sender}" class="post-user-link">
@@ -264,8 +254,8 @@
                         ${mediaHTML}
                         <div class="post-caption"><b>${post.sender}</b> ${post.caption}</div>
                         <div class="post-actions">
-                            <span onclick="handleLike(this, '${post._id}', '${post.sender}')" style="cursor:pointer;">
-                                <i class="far fa-heart"></i> <span class="like-count">${post.likes || 0}</span>
+                            <span onclick="handleLike(this, '${post._id}', '${post.sender}')" style="cursor:pointer; color: ${heartColor}">
+                                <i class="${heartClass}"></i> <span class="like-count">${post.likes || 0}</span>
                             </span>
                             <span style="cursor:pointer;"><i class="far fa-comment"></i> ${(post.comments || []).length}</span>
                         </div>
@@ -279,10 +269,52 @@
                     `;
                     feed.appendChild(postDiv);
                 }
-            } catch (err) { console.error("Feed error:", err); }
+            } catch (err) { console.error(err); }
         }
 
-        // 3. DELETE POST
+        async function handleLike(btn, postId, postOwner) {
+            const icon = btn.querySelector('i');
+            const countSpan = btn.querySelector('.like-count');
+
+            try {
+                const response = await fetch(`/api/posts/${postId}/like`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: myName })
+                });
+                const data = await response.json();
+
+                // Update UI based on server response
+                countSpan.innerText = data.likes;
+                if (data.likedBy.includes(myName)) {
+                    icon.classList.replace('far', 'fas');
+                    btn.style.color = "#ff4b2b";
+                    socket.emit('send_like', { sender: myName, owner: postOwner });
+                } else {
+                    icon.classList.replace('fas', 'far');
+                    btn.style.color = "white";
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function submitComment(postId) {
+            const input = document.getElementById(`input-${postId}`);
+            const text = input.value.trim();
+            if (!text) return;
+
+            try {
+                const response = await fetch(`/api/posts/${postId}/comment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user: myName, text: text })
+                });
+                if (response.ok) {
+                    input.value = '';
+                    loadFeed(); // Refresh feed to show new permanent comment
+                }
+            } catch (err) { console.error(err); }
+        }
+
         async function deletePost(postId) {
             if (!confirm("Are you sure?")) return;
             try {
@@ -295,21 +327,6 @@
             } catch (err) { console.error(err); }
         }
 
-        // 4. COMMENTS & SEARCH
-        async function submitComment(postId) {
-            const input = document.getElementById(`input-${postId}`);
-            const text = input.value.trim();
-            if (!text) return;
-            try {
-                const response = await fetch(`/api/posts/${postId}/comment`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user: myName, text: text })
-                });
-                if (response.ok) { input.value = ''; loadFeed(); }
-            } catch (err) { console.error(err); }
-        }
-
         async function searchUsers(query) {
             const resultsDiv = document.getElementById('search-results');
             if (query.length < 1) { resultsDiv.style.display = 'none'; return; }
@@ -317,35 +334,13 @@
                 const response = await fetch(`/api/search/${encodeURIComponent(query)}`);
                 const users = await response.json();
                 resultsDiv.style.display = users.length > 0 ? 'block' : 'none';
-                resultsDiv.innerHTML = users.map(user => {
-                    const avatar = user.profilePic ? 
-                        `<img src="${user.profilePic}" style="width:100%; height:100%; object-fit:cover;">` : 
-                        user.username.charAt(0).toUpperCase();
-                    return `
-                        <a href="profile.html?user=${user.username}" class="search-item">
-                            <div class="mini-avatar">${avatar}</div>
-                            <span>${user.username}</span>
-                        </a>
-                    `;
-                }).join('');
+                resultsDiv.innerHTML = users.map(user => `
+                    <a href="profile.html?user=${user.username}" class="search-item">
+                        <div class="mini-avatar">${user.profilePic ? `<img src="${user.profilePic}">` : user.username.charAt(0).toUpperCase()}</div>
+                        <span>${user.username}</span>
+                    </a>
+                `).join('');
             } catch (err) { console.error(err); }
-        }
-
-        function handleLike(btn, postId, postOwner) {
-            const icon = btn.querySelector('i');
-            const countSpan = btn.querySelector('.like-count');
-            let count = parseInt(countSpan.innerText);
-            
-            if (icon.classList.contains('far')) {
-                icon.classList.replace('far', 'fas');
-                icon.style.color = "#ff4b2b";
-                countSpan.innerText = count + 1;
-                socket.emit('send_like', { sender: myName, owner: postOwner });
-            } else {
-                icon.classList.replace('fas', 'far');
-                icon.style.color = "white";
-                countSpan.innerText = count - 1;
-            }
         }
 
         loadFeed();
