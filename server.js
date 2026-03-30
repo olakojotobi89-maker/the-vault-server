@@ -18,7 +18,9 @@ app.use(express.json({ limit: '50mb' }));
 app.use(cors());
 app.use(express.static(path.join(__dirname)));
 
-// --- ROUTES ---
+// --- FIXED ROUTES ---
+// This ensures that whether the browser asks for /, /login, or /login.html, 
+// it correctly serves your index.html file.
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -27,8 +29,11 @@ app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- MONGODB CONNECTION: CLEAN MODERN MODE ---
-// Listing shards directly is still the best way to beat VPN DNS issues.
+app.get('/login.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// --- MONGODB CONNECTION ---
 const MONGO_URI = "mongodb://olakojotobi89_db_user:VaultPass2026@cluster0-shard-00-00.fuesl9b.mongodb.net:27017,cluster0-shard-00-01.fuesl9b.mongodb.net:27017,cluster0-shard-00-02.fuesl9b.mongodb.net:27017/vaultDB?ssl=true&replicaSet=atlas-fuesl9b-shard-0&authSource=admin";
 
 mongoose.connect(MONGO_URI, {
