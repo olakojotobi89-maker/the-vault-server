@@ -30,10 +30,11 @@ mongoose.connect(MONGO_URI).then(() => console.log("🚀 DATABASE CONNECTED")).c
 const User = mongoose.model('User', new mongoose.Schema({
     username: { type: String, unique: true, required: true, index: true },
     password: { type: String, required: true },
-    profilePic: String, // Added for Edit Profile
+    profilePic: String,
     bio: { type: String, default: "Welcome to my vault." },
-    followers: [{ type: String }], // Simplified for easier follow checks
-    following: [{ type: String }]
+    followers: [{ type: String }],
+    following: [{ type: String }],
+    blockedUsers: [{ type: String }] // Added to track blocked users
 }));
 
 const Message = mongoose.model('Message', new mongoose.Schema({
@@ -41,82 +42,93 @@ const Message = mongoose.model('Message', new mongoose.Schema({
     receiver: { type: String, required: true, index: true },
     content: { type: String, required: true },
     type: { type: String, default: 'text' }, // 'text', 'voice', 'image'
-    duration: String, // For Voice Notes
-    timestamp: { type: Date, default: Date.now },
+    duration: String,
+    timestamp: { type: Date, default: Date.now }, // No "expires" field = Stored Forever
     seen: { type: Boolean, default: false }
 }));
 
 // --- API ROUTES ---
 
-// UPDATE PROFILE
-app.post('/api/update-profile', async (req, res) => {
+// BLOCK/UNBLOCK LOGIC
+app.post('/api/block-user', async (req, res) => {
     try {
-        const { username, bio, profilePic } = req.body;
-        await User.findOneAndUpdate({ username }, { bio, profilePic });
+        const { myUsername, targetUsername } = req.body;
+        const user = await User.findOne({ username: myUsername });
+        
+        let isNowBlocked = false;
+        if (user.blockedUsers.includes(targetUsername)) {
+            await User.findOneAndUpdate({ username: myUsername }, { $pull: { blockedUsers: targetUsername } });
+        } else {
+            await User.findOneAndUpdate({ username: myUsername }, { $addToSet: { blockedUsers: targetUsername } });
+            isNowBlocked = true;
+        }
+        res.json({ success: true, isBlocked: isNowBlocked });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE MESSAGE (Permanent Deletion)
+app.post('/api/delete-message', async (req, res) => {
+    try {
+        const { messageId, username } = req.body;
+        await Message.findOneAndDelete({ _id: messageId, sender: username });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE MESSAGE (Active)
-app.post('/api/delete-message', async (req, res) => {
+// GET CHAT HISTORY (Infinite Scroll Ready)
+app.get('/api/chat/:user1/:user2', async (req, res) => {
     try {
-        const { messageId, username } = req.body;
-        const msg = await Message.findById(messageId);
-        if (msg.sender === username) {
-            await Message.findByIdAndDelete(messageId);
-            res.json({ success: true });
-        } else {
-            res.status(403).json({ error: "Unauthorized" });
-        }
+        const { user1, user2 } = req.params;
+        const messages = await Message.find({
+            $or: [{ sender: user1, receiver: user2 }, { sender: user2, receiver: user1 }]
+        }).sort({ timestamp: 1 });
+        res.json(messages);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET PROFILE (Required for profile.html)
 app.get('/api/profile/:username', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.params.username });
-        if (!user) return res.status(404).json({ error: "User not found" });
         res.json(user);
+    } catch (err) { res.status(500).json({ error: "Profile error" }); }
+});
+
+// SIGNUP & LOGIN
+app.post('/api/signup', async (req, res) => {
+    try {
+        const hashedPassword = await bcrypt.hash(req.body.password, 10);
+        await User.create({ ...req.body, password: hashedPassword });
+        res.json({ success: true });
+    } catch (err) { res.status(400).json({ error: "User exists" }); }
+});
+
+app.post('/api/login', async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.body.username });
+        if (user && await bcrypt.compare(req.body.password, user.password)) {
+            res.json({ message: "Access Granted", username: user.username });
+        } else { res.status(401).json({ error: "Invalid" }); }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// (Existing signup/login/search/posts routes stay here...)
-app.post('/api/signup', async (req, res) => { try { const hashedPassword = await bcrypt.hash(req.body.password, 10); await User.create({ ...req.body, password: hashedPassword }); res.json({ success: true }); } catch (err) { res.status(400).json({ error: err.message }); }});
-app.post('/api/login', async (req, res) => { try { const user = await User.findOne({ username: req.body.username }); if (user && await bcrypt.compare(req.body.password, user.password)) { res.json({ message: "Access Granted", username: user.username }); } else { res.status(401).json({ error: "Invalid" }); } } catch (err) { res.status(500).json({ error: err.message }); }});
-
-// --- SOCKET LOGIC (CALLING & VOICE) ---
+// --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
     socket.on('join_private', (username) => socket.join(username));
     
-    // Send Message (Text/Voice)
     socket.on('send_message', async (data) => {
         try {
+            // Check if receiver has blocked sender before delivering
+            const receiverDoc = await User.findOne({ username: data.receiver });
+            if (receiverDoc && receiverDoc.blockedUsers.includes(data.sender)) {
+                return; // Silent fail for blocked senders
+            }
+
             const newMessage = await Message.create(data);
             io.to(data.receiver).emit('receive_message', newMessage);
             io.to(data.sender).emit('receive_message', newMessage);
         } catch (err) { console.error(err); }
     });
 
-    // RTC CALLING HANDSHAKE
-    socket.on('call_user', (data) => {
-        // data contains: { userToCall, signalData, from, type: 'video'/'audio' }
-        io.to(data.userToCall).emit('incoming_call', {
-            signal: data.signalData,
-            from: data.from,
-            type: data.type
-        });
-    });
-
-    socket.on('answer_call', (data) => {
-        io.to(data.to).emit('call_accepted', data.signal);
-    });
-
-    socket.on('end_call', (data) => {
-        io.to(data.to).emit('call_ended');
-    });
-
-    // DELETE MESSAGE SOCKET (To remove it from UI instantly)
-    socket.on('message_deleted', (data) => {
-        io.to(data.receiver).emit('remove_message_from_ui', data.messageId);
-    });
+    socket.on('call_user', (data) => io.to(data.userToCall).emit('incoming_call', data));
+    socket.on('answer_call', (data) => io.to(data.to).emit('call_accepted', data.signal));
 });
