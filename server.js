@@ -15,19 +15,14 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
+// --- BODY PARSER LIMITS (Fixes "Post not going" for large images) ---
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
 // --- RENDER ROUTING ---
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.get('/home', (req, res) => {
-    res.sendFile(path.join(__dirname, 'home.html'));
-});
-
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/home', (req, res) => res.sendFile(path.join(__dirname, 'home.html')));
 app.use(express.static(path.join(__dirname)));
 
 // --- MONGODB ---
@@ -76,57 +71,38 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// NEW: GET CHAT HISTORY (This fixes the "disappearing on refresh" problem)
-app.get('/api/messages/:user1/:user2', async (req, res) => {
+// Check if user follows another (For the UI button)
+app.get('/api/follow-status/:me/:target', async (req, res) => {
     try {
-        const { user1, user2 } = req.params;
-        const history = await Message.find({
-            $or: [
-                { sender: user1, receiver: user2 },
-                { sender: user2, receiver: user1 }
-            ]
-        }).sort({ timestamp: 1 }); 
-        res.json(history);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.delete('/api/posts/:id', async (req, res) => {
-    try {
-        const post = await Post.findById(req.params.id);
-        if (!post) return res.status(404).json({ error: "Post not found" });
-        if (post.sender !== req.body.username) return res.status(403).json({ error: "Unauthorized" });
-        await Post.findByIdAndDelete(req.params.id);
-        res.json({ success: true });
+        const user = await User.findOne({ username: req.params.me });
+        const isFollowing = user.following.includes(req.params.target);
+        res.json({ isFollowing });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/follow', async (req, res) => {
     const { follower, target } = req.body; 
+    if (follower === target) return res.status(400).json({ error: "Cannot follow yourself" });
     try {
         const targetUser = await User.findOne({ username: target });
-        if (targetUser.followers.includes(follower)) {
+        const isFollowing = targetUser.followers.includes(follower);
+
+        if (isFollowing) {
             await User.findOneAndUpdate({ username: target }, { $pull: { followers: follower } });
             await User.findOneAndUpdate({ username: follower }, { $pull: { following: target } });
-            res.json({ success: true, action: "unfollowed" });
+            res.json({ success: true, action: "unfollowed", isFollowing: false });
         } else {
             await User.findOneAndUpdate({ username: target }, { $push: { followers: follower } });
             await User.findOneAndUpdate({ username: follower }, { $push: { following: target } });
-            res.json({ success: true, action: "followed" });
+            res.json({ success: true, action: "followed", isFollowing: true });
         }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/update-settings', async (req, res) => {
-    try {
-        const { username, settings } = req.body;
-        await User.findOneAndUpdate({ username }, { settings: settings });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Failed update" }); }
-});
-
 app.get('/api/posts', async (req, res) => {
     try {
-        const posts = await Post.find().sort({ timestamp: -1 }).limit(50);
+        // Removed .limit(50) so all posts stay visible forever
+        const posts = await Post.find().sort({ timestamp: -1 });
         res.json(posts);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -135,32 +111,14 @@ app.post('/api/posts', async (req, res) => {
     try {
         const newPost = await Post.create(req.body);
         res.json({ success: true, post: newPost });
-    } catch (err) { res.status(500).json({ error: "Post failed." }); }
+    } catch (err) { res.status(500).json({ error: "Post failed. Content might be too large." }); }
 });
 
-app.post('/api/posts/:id/like', async (req, res) => {
+app.get('/api/profile/:username', async (req, res) => {
     try {
-        const post = await Post.findById(req.params.id);
-        const hasLiked = post.likedBy.includes(req.body.username);
-        if (hasLiked) {
-            post.likedBy = post.likedBy.filter(u => u !== req.body.username);
-            post.likes = Math.max(0, post.likes - 1);
-        } else {
-            post.likedBy.push(req.body.username);
-            post.likes += 1;
-        }
-        await post.save();
-        res.json({ likes: post.likes, likedBy: post.likedBy });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.get('/api/search/:query', async (req, res) => {
-    try {
-        const users = await User.find({ 
-            username: { $regex: req.params.query, $options: 'i' } 
-        }).limit(10).select('username profilePic');
-        res.json(users);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+        const user = await User.findOne({ username: req.params.username }).select('-password');
+        res.json(user);
+    } catch (err) { res.status(500).json({ error: "User not found" }); }
 });
 
 app.post('/api/signup', async (req, res) => {
@@ -176,31 +134,22 @@ app.post('/api/login', async (req, res) => {
         const user = await User.findOne({ username: req.body.username });
         if (user && await bcrypt.compare(req.body.password, user.password)) {
             res.json({ message: "Access Granted", username: user.username, settings: user.settings });
-        } else { res.status(401).json({ error: "Invalid" }); }
+        } else { res.status(401).json({ error: "Invalid credentials" }); }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
-    // When a user opens the chat, they MUST join their own room to receive messages
-    socket.on('join_private', (username) => {
-        socket.join(username);
-        console.log(`👤 ${username} joined their private vault room.`);
-    });
+    socket.on('join_private', (username) => socket.join(username));
     
     socket.on('send_message', async (data) => {
         try {
             const receiverDoc = await User.findOne({ username: data.receiver });
             if (receiverDoc && receiverDoc.blockedUsers.includes(data.sender)) return;
-
-            // 1. Save to Database first (So it stays forever)
             const newMessage = await Message.create(data);
-
-            // 2. Send to Receiver AND Sender (For multi-device sync)
             io.to(data.receiver).emit('receive_message', newMessage);
             io.to(data.sender).emit('receive_message', newMessage);
-            
-        } catch (err) { console.error("Chat Error:", err); }
+        } catch (err) { console.error(err); }
     });
 
     socket.on('send_like', (data) => {
