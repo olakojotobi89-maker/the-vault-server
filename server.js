@@ -19,6 +19,18 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
+
+// --- RENDER ROUTING FIX ---
+// This ensures that even if you rename files, the server finds them.
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html')); // index is now your Login
+});
+
+app.get('/home', (req, res) => {
+    res.sendFile(path.join(__dirname, 'home.html')); // home is now your Feed
+});
+
+// Serve all other static files (CSS, JS, images)
 app.use(express.static(path.join(__dirname)));
 
 // --- MONGODB ---
@@ -69,20 +81,17 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // 1. FOLLOW / UNFOLLOW SYSTEM
 app.post('/api/follow', async (req, res) => {
-    const { follower, target } = req.body; // follower = me, target = user I want to follow
+    const { follower, target } = req.body; 
     try {
         const targetUser = await User.findOne({ username: target });
         const me = await User.findOne({ username: follower });
-
         if (!targetUser || !me) return res.status(404).json({ error: "User not found" });
 
         if (targetUser.followers.includes(follower)) {
-            // UNFOLLOW LOGIC
             await User.findOneAndUpdate({ username: target }, { $pull: { followers: follower } });
             await User.findOneAndUpdate({ username: follower }, { $pull: { following: target } });
             res.json({ success: true, action: "unfollowed" });
         } else {
-            // FOLLOW LOGIC
             await User.findOneAndUpdate({ username: target }, { $push: { followers: follower } });
             await User.findOneAndUpdate({ username: follower }, { $push: { following: target } });
             res.json({ success: true, action: "followed" });
