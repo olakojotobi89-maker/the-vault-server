@@ -7,11 +7,13 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        // Check if logged in
         if (!localStorage.getItem('vault_username')) {
             window.location.href = 'index.html';
         }
         function logoutVault() {
             localStorage.removeItem('vault_username');
+            localStorage.removeItem('vault_settings');
             window.location.href = 'index.html';
         }
     </script>
@@ -65,7 +67,7 @@
         .post-btn { background: #fdbb2d; border: none; padding: 8px 25px; border-radius: 12px; font-weight: bold; cursor: pointer; }
 
         #feed-display { display: flex; flex-direction: column; gap: 15px; }
-        .post { background: rgba(0, 0, 0, 0.25); border-radius: 20px; padding: 15px; transition: opacity 0.3s ease; border: 1px solid rgba(255,255,255,0.05); }
+        .post { background: rgba(0, 0, 0, 0.25); border-radius: 20px; padding: 15px; border: 1px solid rgba(255,255,255,0.05); }
         .post-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
         .post-user-link { text-decoration: none; color: #00d2ff; font-weight: bold; display: flex; align-items: center; gap: 8px; }
         .mini-avatar { width: 32px; height: 32px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); overflow: hidden; }
@@ -200,7 +202,7 @@
                     fileNameLabel.innerText = 'No file selected';
                     loadFeed(); 
                 }
-            } catch (err) { alert("Connection error."); }
+            } catch (err) { alert("Post failed. Image might be too large."); }
             finally {
                 postBtn.innerText = "Post";
                 postBtn.disabled = false;
@@ -223,9 +225,10 @@
                     const postDiv = document.createElement('div');
                     postDiv.className = 'post';
                     
+                    // Fetch user pfp safely
                     const userRes = await fetch(`/api/profile/${post.sender}`);
                     const userData = await userRes.json();
-                    const avatarHTML = userData.profilePic ? `<img src="${userData.profilePic}">` : post.sender.charAt(0).toUpperCase();
+                    const avatarHTML = (userData && userData.profilePic) ? `<img src="${userData.profilePic}">` : post.sender.charAt(0).toUpperCase();
 
                     let mediaHTML = '';
                     if (post.media) {
@@ -238,7 +241,6 @@
                         <div class="comment-item"><b>${c.user}:</b> ${c.text}</div>
                     `).join('');
 
-                    // Logic to check if I have liked this post
                     const isLiked = (post.likedBy || []).includes(myName);
                     const heartClass = isLiked ? 'fas fa-heart' : 'far fa-heart';
                     const heartColor = isLiked ? '#ff4b2b' : 'white';
@@ -252,7 +254,7 @@
                             ${post.sender === myName ? `<i class="fas fa-trash-alt delete-icon" onclick="deletePost('${post._id}')"></i>` : ''}
                         </div>
                         ${mediaHTML}
-                        <div class="post-caption"><b>${post.sender}</b> ${post.caption}</div>
+                        <div class="post-caption"><b>${post.sender}</b> ${post.caption || ''}</div>
                         <div class="post-actions">
                             <span onclick="handleLike(this, '${post._id}', '${post.sender}')" style="cursor:pointer; color: ${heartColor}">
                                 <i class="${heartClass}"></i> <span class="like-count">${post.likes || 0}</span>
@@ -269,7 +271,7 @@
                     `;
                     feed.appendChild(postDiv);
                 }
-            } catch (err) { console.error(err); }
+            } catch (err) { console.error("Feed error:", err); }
         }
 
         async function handleLike(btn, postId, postOwner) {
@@ -284,7 +286,6 @@
                 });
                 const data = await response.json();
 
-                // Update UI based on server response
                 countSpan.innerText = data.likes;
                 if (data.likedBy.includes(myName)) {
                     icon.classList.replace('far', 'fas');
@@ -310,13 +311,13 @@
                 });
                 if (response.ok) {
                     input.value = '';
-                    loadFeed(); // Refresh feed to show new permanent comment
+                    loadFeed();
                 }
             } catch (err) { console.error(err); }
         }
 
         async function deletePost(postId) {
-            if (!confirm("Are you sure?")) return;
+            if (!confirm("Remove this post from the Vault?")) return;
             try {
                 const response = await fetch(`/api/posts/${postId}`, {
                     method: 'DELETE',
@@ -324,6 +325,7 @@
                     body: JSON.stringify({ username: myName })
                 });
                 if (response.ok) loadFeed();
+                else alert("Delete failed.");
             } catch (err) { console.error(err); }
         }
 
