@@ -14,9 +14,6 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 VAULT SERVER ACTIVE ON PORT ${PORT}`);
-});
 
 // INCREASE LIMIT: Crucial for permanent Base64 Profile Pictures and Posts
 app.use(express.json({ limit: '50mb' }));
@@ -32,7 +29,7 @@ mongoose.connect(MONGO_URI).then(() => console.log("🚀 DATABASE CONNECTED")).c
 const User = mongoose.model('User', new mongoose.Schema({
     username: { type: String, unique: true, required: true, index: true },
     password: { type: String, required: true },
-    profilePic: { type: String, default: "" }, // Permanent Base64 string
+    profilePic: { type: String, default: "" }, 
     bio: { type: String, default: "Welcome to my vault." },
     followers: [{ type: String }],
     following: [{ type: String }],
@@ -47,10 +44,15 @@ const User = mongoose.model('User', new mongoose.Schema({
 const Post = mongoose.model('Post', new mongoose.Schema({
     sender: { type: String, required: true, index: true },
     caption: String,
-    media: String, // Permanent Base64 string
+    media: String, 
     type: { type: String, default: 'image' }, 
+    likedBy: [{ type: String }], // Array of usernames who liked
     likes: { type: Number, default: 0 },
-    comments: [{ user: String, text: String, date: { type: Date, default: Date.now } }],
+    comments: [{ 
+        user: String, 
+        text: String, 
+        date: { type: Date, default: Date.now } 
+    }],
     timestamp: { type: Date, default: Date.now }
 }));
 
@@ -65,13 +67,17 @@ const Message = mongoose.model('Message', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// POSTS API
+// 1. UPDATED POSTS API (Get all or specific user posts)
 app.get('/api/posts', async (req, res) => {
     try {
-        const targetUser = req.query.user;
-        let query = {};
-        if (targetUser) query = { sender: targetUser };
-        const posts = await Post.find(query).sort({ timestamp: -1 }).limit(50);
+        const posts = await Post.find().sort({ timestamp: -1 }).limit(50);
+        res.json(posts);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/posts/user/:username', async (req, res) => {
+    try {
+        const posts = await Post.find({ sender: req.params.username }).sort({ timestamp: -1 });
         res.json(posts);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -80,41 +86,70 @@ app.post('/api/posts', async (req, res) => {
     try {
         const newPost = await Post.create(req.body);
         res.json({ success: true, post: newPost });
-    } catch (err) { res.status(500).json({ error: "Post failed. Image might be too large." }); }
+    } catch (err) { res.status(500).json({ error: "Post failed." }); }
 });
 
-// PROFILE & SETTINGS API
-app.post('/api/update-profile', async (req, res) => {
+// 2. PERMANENT LIKES & COMMENTS
+app.post('/api/posts/:id/like', async (req, res) => {
+    const { username } = req.body;
     try {
-        const { username, bio, profilePic } = req.body;
-        // Updates the user document with the new Bio and permanent Profile Pic
-        await User.findOneAndUpdate({ username }, { bio, profilePic }, { new: true });
+        const post = await Post.findById(req.params.id);
+        const hasLiked = post.likedBy.includes(username);
+
+        if (hasLiked) {
+            // Unlike
+            post.likedBy = post.likedBy.filter(u => u !== username);
+            post.likes = Math.max(0, post.likes - 1);
+        } else {
+            // Like
+            post.likedBy.push(username);
+            post.likes += 1;
+        }
+        await post.save();
+        res.json({ likes: post.likes, likedBy: post.likedBy });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/posts/:id/comment', async (req, res) => {
+    try {
+        const { user, text } = req.body;
+        const post = await Post.findByIdAndUpdate(
+            req.params.id,
+            { $push: { comments: { user, text } } },
+            { new: true }
+        );
+        res.json(post);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 3. PROFILE UPDATES (Bio and Profile Picture)
+app.post('/api/profile/:username/bio', async (req, res) => {
+    try {
+        await User.findOneAndUpdate({ username: req.params.username }, { bio: req.body.bio });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/update-settings', async (req, res) => {
+app.post('/api/profile/:username/pfp', async (req, res) => {
     try {
-        const { username, settings } = req.body;
-        await User.findOneAndUpdate({ username }, { settings });
+        await User.findOneAndUpdate({ username: req.params.username }, { profilePic: req.body.image });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/profile/:username', async (req, res) => {
     try {
-        const user = await User.findOne({ username: req.params.username });
+        const user = await User.findOne({ username: req.params.username }).select('-password');
         if (!user) return res.status(404).json({ error: "Citizen not found" });
         res.json(user);
     } catch (err) { res.status(500).json({ error: "Profile retrieval error" }); }
 });
 
-// SEARCH API (Fixed for empty queries)
+// SEARCH API
 app.get('/api/search/:query', async (req, res) => {
     try {
         const searchQuery = req.params.query;
         if (!searchQuery || searchQuery === "undefined") return res.json([]);
-        
         const users = await User.find({ 
             username: { $regex: searchQuery, $options: 'i' } 
         }).limit(10).select('username profilePic');
@@ -156,6 +191,11 @@ io.on('connection', (socket) => {
     });
 
     socket.on('send_like', (data) => {
+        // Broadcast notification to the post owner
         io.to(data.owner).emit('receive_like', { sender: data.sender, owner: data.owner });
     });
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 VAULT SERVER ACTIVE ON PORT ${PORT}`);
 });
