@@ -12,7 +12,7 @@
         }
     </script>
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/style.css"> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root { --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); }
         body {
@@ -55,11 +55,15 @@
         .action-btn {
             background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.1);
             color: white; padding: 8px 20px; border-radius: 12px; cursor: pointer; transition: 0.3s;
+            font-weight: 600;
         }
         .action-btn:hover { background: rgba(255,255,255,0.25); }
+        .follow-btn { background: #fdbb2d; color: black; border: none; }
+        .follow-btn.following { background: rgba(255,255,255,0.2); color: white; }
 
         /* Stats Row */
         .stats { display: flex; justify-content: space-around; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
+        .stat-item { text-align: center; cursor: pointer; }
         .stat-val { display: block; font-weight: bold; font-size: 18px; }
         .stat-label { font-size: 11px; opacity: 0.6; text-transform: uppercase; }
 
@@ -92,7 +96,7 @@
             <a href="home.html" style="color: white; text-decoration: none; font-size: 14px;">
                 <i class="fas fa-arrow-left"></i> Feed
             </a>
-            <i class="fas fa-ellipsis-v" style="opacity: 0.5;"></i>
+            <a href="setting.html" style="color: white; opacity: 0.7;"><i class="fas fa-cog"></i></a>
         </div>
 
         <div class="glass-card header-box">
@@ -109,17 +113,19 @@
             
             <div id="profile-controls">
                 <button id="edit-btn" class="action-btn" onclick="toggleEdit()" style="display:none">Edit Profile</button>
+                <button id="follow-btn" class="action-btn follow-btn" onclick="handleFollow()" style="display:none">Follow</button>
                 <button id="save-btn" class="action-btn" onclick="saveBio()" style="display:none; background: #fdbb2d; color: black;">Save Bio</button>
             </div>
 
             <div class="stats">
                 <div class="stat-item"><span class="stat-val" id="count-posts">0</span><span class="stat-label">Posts</span></div>
+                <div class="stat-item"><span class="stat-val" id="count-followers">0</span><span class="stat-label">Followers</span></div>
+                <div class="stat-item"><span class="stat-val" id="count-following">0</span><span class="stat-label">Following</span></div>
                 <div class="stat-item"><span class="stat-val" id="count-likes">0</span><span class="stat-label">Likes</span></div>
             </div>
         </div>
 
-        <div class="grid-feed" id="profile-grid">
-            </div>
+        <div class="grid-feed" id="profile-grid"></div>
     </div>
 
     <div class="modal" id="post-modal" onclick="this.style.display='none'">
@@ -133,29 +139,43 @@
         const urlParams = new URLSearchParams(window.location.search);
         const profileUser = urlParams.get('user') || localStorage.getItem('vault_username');
         const myName = localStorage.getItem('vault_username');
+        let isFollowing = false;
 
         async function initProfile() {
             try {
-                // 1. Fetch User Info (Bio & PFP)
                 const userRes = await fetch(`/api/profile/${profileUser}`);
                 const userData = await userRes.json();
 
                 document.getElementById('display-username').innerText = profileUser;
                 document.getElementById('display-bio').innerText = userData.bio || "No bio yet.";
                 
+                // Set Stats
+                document.getElementById('count-followers').innerText = userData.followers ? userData.followers.length : 0;
+                document.getElementById('count-following').innerText = userData.following ? userData.following.length : 0;
+
                 if (userData.profilePic) {
                     document.getElementById('pfp-target').innerHTML = `<img src="${userData.profilePic}">`;
                 } else {
                     document.getElementById('pfp-target').innerText = profileUser.charAt(0).toUpperCase();
                 }
 
-                // Show Edit features only if owner
+                // Logic for Follow vs Edit Button
+                const followBtn = document.getElementById('follow-btn');
+                const editBtn = document.getElementById('edit-btn');
+
                 if (profileUser === myName) {
-                    document.getElementById('edit-btn').style.display = 'inline-block';
+                    editBtn.style.display = 'inline-block';
                     document.getElementById('pfp-hint').style.display = 'block';
+                } else {
+                    followBtn.style.display = 'inline-block';
+                    // Check if already following
+                    if (userData.followers && userData.followers.includes(myName)) {
+                        isFollowing = true;
+                        followBtn.innerText = "Following";
+                        followBtn.classList.add('following');
+                    }
                 }
 
-                // 2. Fetch User Posts
                 const postRes = await fetch(`/api/posts/user/${profileUser}`);
                 const posts = await postRes.json();
                 const grid = document.getElementById('profile-grid');
@@ -163,13 +183,11 @@
                 document.getElementById('count-posts').innerText = posts.length;
 
                 let totalLikes = 0;
-
                 posts.forEach(post => {
                     totalLikes += (post.likes || 0);
                     const item = document.createElement('div');
                     item.className = 'grid-item';
                     item.onclick = () => openFullPost(post);
-
                     if (post.media) {
                         item.innerHTML = post.type === 'video' 
                             ? `<video src="${post.media}"></video>` 
@@ -179,19 +197,40 @@
                     }
                     grid.appendChild(item);
                 });
-
                 document.getElementById('count-likes').innerText = totalLikes;
 
             } catch (err) { console.error("Error loading profile:", err); }
         }
 
-        // --- EDIT LOGIC ---
+        async function handleFollow() {
+            const btn = document.getElementById('follow-btn');
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/follow', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        follower: myName, 
+                        target: profileUser 
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    window.location.reload(); // Refresh to update counts
+                }
+            } catch (err) {
+                console.error("Follow error:", err);
+                btn.disabled = false;
+            }
+        }
+
+        // Existing functions (toggleEdit, saveBio, uploadPfp, openFullPost) remain the same...
         function toggleEdit() {
             const bioText = document.getElementById('display-bio');
             const bioInput = document.getElementById('edit-bio-input');
             const saveBtn = document.getElementById('save-btn');
             const editBtn = document.getElementById('edit-btn');
-
             bioText.style.display = 'none';
             bioInput.style.display = 'block';
             bioInput.value = bioText.innerText;
@@ -218,7 +257,6 @@
         async function uploadPfp() {
             const file = document.getElementById('pfp-file').files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onload = async () => {
@@ -232,18 +270,15 @@
             };
         }
 
-        // --- POST MODAL LOGIC ---
         function openFullPost(post) {
             const modal = document.getElementById('post-modal');
             const render = document.getElementById('modal-render');
-            
             let mediaContent = '';
             if (post.media) {
                 mediaContent = post.type === 'video' 
                     ? `<video src="${post.media}" controls style="width:100%; border-radius:20px;"></video>` 
                     : `<img src="${post.media}" style="width:100%; border-radius:20px;">`;
             }
-
             render.innerHTML = `
                 <div class="glass-card" style="padding:15px; background: rgba(0,0,0,0.8);">
                     <div style="font-weight:bold; margin-bottom:12px; display:flex; align-items:center; gap:10px;">
