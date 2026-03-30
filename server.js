@@ -13,11 +13,11 @@ const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] } 
 });
 
-// --- STEP 1: BIND PORT IMMEDIATELY ---
-// This tells Render the app is "Live" before it times out during DB connection
+// --- STEP 1: RENDER PORT BINDING (CRITICAL) ---
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 VAULT SERVER ACTIVE ON PORT ${PORT}`);
+    console.log(`📡 HEARTBEAT: Render scanner detection active`);
 });
 
 // Middleware
@@ -25,20 +25,12 @@ app.use(express.json({ limit: '50mb' }));
 app.use(cors());
 app.use(express.static(path.join(__dirname)));
 
-// --- FIXED ROUTES ---
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+// --- ROUTES ---
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.get('/login.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// --- MONGODB CONNECTION (SRV FORMAT) ---
+// --- MONGODB CONNECTION ---
 const MONGO_URI = "mongodb+srv://olakojotobi89_db_user:VaultPass2026@cluster0.fuesl9b.mongodb.net/vaultDB?retryWrites=true&w=majority";
 
 mongoose.connect(MONGO_URI, {
@@ -46,33 +38,26 @@ mongoose.connect(MONGO_URI, {
     socketTimeoutMS: 45000,
 })
     .then(() => console.log("🚀 VAULT DATABASE CONNECTED SUCCESSFULLY!"))
-    .catch(err => {
-        console.error("❌ CONNECTION REJECTED:", err.message);
-    });
+    .catch(err => console.error("❌ DATABASE CONNECTION REJECTED:", err.message));
 
 // --- DATABASE SCHEMAS ---
-const UserSchema = new mongoose.Schema({
+const User = mongoose.model('User', new mongoose.Schema({
     username: { type: String, unique: true, required: true, index: true },
     password: { type: String, required: true },
-    email: { type: String, sparse: true },
+    email: String,
     phone: String,
     bio: { type: String, default: "Welcome to my vault." },
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
-});
-const User = mongoose.model('User', UserSchema);
+}));
 
 const Post = mongoose.model('Post', new mongoose.Schema({
     sender: { type: String, index: true },
     caption: String,
     media: String, 
-    type: String,  
+    type: { type: String, default: 'image' },
     timestamp: { type: Date, default: Date.now },
-    comments: [{
-        user: String,
-        text: String,
-        timestamp: { type: Date, default: Date.now }
-    }]
+    comments: [{ user: String, text: String, timestamp: { type: Date, default: Date.now } }]
 }));
 
 const Message = mongoose.model('Message', new mongoose.Schema({
@@ -84,77 +69,33 @@ const Message = mongoose.model('Message', new mongoose.Schema({
     seen: { type: Boolean, default: false }
 }));
 
-// --- API ROUTES (REPAIR & DEBUG MODE) ---
+// --- API ROUTES ---
+
+// SIGNUP
 app.post('/api/signup', async (req, res) => {
     try {
         const { username, password, email, phone } = req.body;
-        console.log(`📝 SIGNUP ATTEMPT: ${username}`);
-
-        if (mongoose.connection.readyState !== 1) {
-            throw new Error("Database connection is not ready. Try again in a few seconds.");
-        }
-
+        if (mongoose.connection.readyState !== 1) throw new Error("Database connecting...");
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({ username, password: hashedPassword, email, phone });
-        
-        await newUser.save();
-        console.log(`✅ SIGNUP SUCCESS: ${username}`);
+        await User.create({ username, password: hashedPassword, email, phone });
         res.json({ success: true, message: "User created" });
-    } catch (err) { 
-        console.error("❌ SIGNUP ERROR:", err.message);
-        res.status(400).json({ error: err.message }); 
-    }
+    } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+// LOGIN
 app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
     try {
-        console.log(`🔑 LOGIN ATTEMPT: ${username}`);
-
-        if (mongoose.connection.readyState !== 1) {
-            throw new Error("Database is still connecting. Please wait 5 seconds.");
+        if (mongoose.connection.readyState !== 1) throw new Error("Database connecting...");
+        const user = await User.findOne({ username: req.body.username });
+        if (user && await bcrypt.compare(req.body.password, user.password)) {
+            res.json({ message: "Access Granted", username: user.username });
+        } else {
+            res.status(401).json({ error: "Invalid credentials" });
         }
-
-        const user = await User.findOne({ username });
-        if (!user) {
-            console.warn(`⚠️ LOGIN FAIL: ${username} not found.`);
-            return res.status(401).json({ error: "Invalid username" });
-        }
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            console.warn(`⚠️ LOGIN FAIL: Password wrong for ${username}.`);
-            return res.status(401).json({ error: "Invalid password" });
-        }
-
-        console.log(`✨ LOGIN SUCCESS: ${username}`);
-        res.json({ message: "Access Granted", username: user.username });
-    } catch (err) { 
-        console.error("❌ LOGIN ERROR:", err.message);
-        res.status(500).json({ error: err.message }); 
-    }
-});
-
-app.get('/api/chat/:user1/:user2', async (req, res) => {
-    try {
-        const { user1, user2 } = req.params;
-        const messages = await Message.find({
-            $or: [
-                { sender: user1, receiver: user2 },
-                { sender: user2, receiver: user1 }
-            ]
-        }).sort({ timestamp: 1 });
-        res.json(messages);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/posts', async (req, res) => {
-    try {
-        const posts = await Post.find().sort({ timestamp: -1 }).limit(30);
-        res.json(posts);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
+// SEARCH (RESTORED)
 app.get('/api/search/:query', async (req, res) => {
     try {
         const users = await User.find({ 
@@ -164,16 +105,32 @@ app.get('/api/search/:query', async (req, res) => {
     } catch (err) { res.json([]); }
 });
 
+// POSTS FEED (RESTORED)
+app.get('/api/posts', async (req, res) => {
+    try {
+        const posts = await Post.find().sort({ timestamp: -1 }).limit(30);
+        res.json(posts);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// CHAT HISTORY
+app.get('/api/chat/:user1/:user2', async (req, res) => {
+    try {
+        const { user1, user2 } = req.params;
+        const messages = await Message.find({
+            $or: [{ sender: user1, receiver: user2 }, { sender: user2, receiver: user1 }]
+        }).sort({ timestamp: 1 });
+        res.json(messages);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
-    socket.on('join_private', (username) => {
-        socket.join(username);
-    });
-
+    socket.on('join_private', (username) => socket.join(username));
+    
     socket.on('send_message', async (data) => {
         try {
             const { sender, receiver, content, type } = data;
-            if (!content) return;
             const newMessage = await Message.create({ sender, receiver, content, type });
             io.to(receiver).emit('receive_message', newMessage);
             io.to(sender).emit('receive_message', newMessage);
