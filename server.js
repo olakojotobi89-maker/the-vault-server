@@ -18,7 +18,9 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 VAULT SERVER ACTIVE ON PORT ${PORT}`);
 });
 
+// INCREASE LIMIT: Crucial for permanent Base64 Profile Pictures and Posts
 app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 app.use(express.static(path.join(__dirname)));
 
@@ -30,84 +32,111 @@ mongoose.connect(MONGO_URI).then(() => console.log("🚀 DATABASE CONNECTED")).c
 const User = mongoose.model('User', new mongoose.Schema({
     username: { type: String, unique: true, required: true, index: true },
     password: { type: String, required: true },
-    profilePic: String,
+    profilePic: { type: String, default: "" }, // Permanent Base64 string
     bio: { type: String, default: "Welcome to my vault." },
     followers: [{ type: String }],
     following: [{ type: String }],
-    blockedUsers: [{ type: String }] // Added to track blocked users
+    blockedUsers: [{ type: String }],
+    settings: {
+        darkMode: { type: Boolean, default: true },
+        privateAccount: { type: Boolean, default: false },
+        notifications: { type: Boolean, default: true }
+    }
+}));
+
+const Post = mongoose.model('Post', new mongoose.Schema({
+    sender: { type: String, required: true, index: true },
+    caption: String,
+    media: String, // Permanent Base64 string
+    type: { type: String, default: 'image' }, 
+    likes: { type: Number, default: 0 },
+    comments: [{ user: String, text: String, date: { type: Date, default: Date.now } }],
+    timestamp: { type: Date, default: Date.now }
 }));
 
 const Message = mongoose.model('Message', new mongoose.Schema({
     sender: { type: String, required: true, index: true },
     receiver: { type: String, required: true, index: true },
     content: { type: String, required: true },
-    type: { type: String, default: 'text' }, // 'text', 'voice', 'image'
-    duration: String,
-    timestamp: { type: Date, default: Date.now }, // No "expires" field = Stored Forever
+    type: { type: String, default: 'text' }, 
+    timestamp: { type: Date, default: Date.now },
     seen: { type: Boolean, default: false }
 }));
 
 // --- API ROUTES ---
 
-// BLOCK/UNBLOCK LOGIC
-app.post('/api/block-user', async (req, res) => {
+// POSTS API
+app.get('/api/posts', async (req, res) => {
     try {
-        const { myUsername, targetUsername } = req.body;
-        const user = await User.findOne({ username: myUsername });
-        
-        let isNowBlocked = false;
-        if (user.blockedUsers.includes(targetUsername)) {
-            await User.findOneAndUpdate({ username: myUsername }, { $pull: { blockedUsers: targetUsername } });
-        } else {
-            await User.findOneAndUpdate({ username: myUsername }, { $addToSet: { blockedUsers: targetUsername } });
-            isNowBlocked = true;
-        }
-        res.json({ success: true, isBlocked: isNowBlocked });
+        const targetUser = req.query.user;
+        let query = {};
+        if (targetUser) query = { sender: targetUser };
+        const posts = await Post.find(query).sort({ timestamp: -1 }).limit(50);
+        res.json(posts);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE MESSAGE (Permanent Deletion)
-app.post('/api/delete-message', async (req, res) => {
+app.post('/api/posts', async (req, res) => {
     try {
-        const { messageId, username } = req.body;
-        await Message.findOneAndDelete({ _id: messageId, sender: username });
+        const newPost = await Post.create(req.body);
+        res.json({ success: true, post: newPost });
+    } catch (err) { res.status(500).json({ error: "Post failed. Image might be too large." }); }
+});
+
+// PROFILE & SETTINGS API
+app.post('/api/update-profile', async (req, res) => {
+    try {
+        const { username, bio, profilePic } = req.body;
+        // Updates the user document with the new Bio and permanent Profile Pic
+        await User.findOneAndUpdate({ username }, { bio, profilePic }, { new: true });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET CHAT HISTORY (Infinite Scroll Ready)
-app.get('/api/chat/:user1/:user2', async (req, res) => {
+app.post('/api/update-settings', async (req, res) => {
     try {
-        const { user1, user2 } = req.params;
-        const messages = await Message.find({
-            $or: [{ sender: user1, receiver: user2 }, { sender: user2, receiver: user1 }]
-        }).sort({ timestamp: 1 });
-        res.json(messages);
+        const { username, settings } = req.body;
+        await User.findOneAndUpdate({ username }, { settings });
+        res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/profile/:username', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.params.username });
+        if (!user) return res.status(404).json({ error: "Citizen not found" });
         res.json(user);
-    } catch (err) { res.status(500).json({ error: "Profile error" }); }
+    } catch (err) { res.status(500).json({ error: "Profile retrieval error" }); }
 });
 
-// SIGNUP & LOGIN
+// SEARCH API (Fixed for empty queries)
+app.get('/api/search/:query', async (req, res) => {
+    try {
+        const searchQuery = req.params.query;
+        if (!searchQuery || searchQuery === "undefined") return res.json([]);
+        
+        const users = await User.find({ 
+            username: { $regex: searchQuery, $options: 'i' } 
+        }).limit(10).select('username profilePic');
+        res.json(users);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// AUTHENTICATION
 app.post('/api/signup', async (req, res) => {
     try {
         const hashedPassword = await bcrypt.hash(req.body.password, 10);
         await User.create({ ...req.body, password: hashedPassword });
         res.json({ success: true });
-    } catch (err) { res.status(400).json({ error: "User exists" }); }
+    } catch (err) { res.status(400).json({ error: "User already exists" }); }
 });
 
 app.post('/api/login', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.body.username });
         if (user && await bcrypt.compare(req.body.password, user.password)) {
-            res.json({ message: "Access Granted", username: user.username });
-        } else { res.status(401).json({ error: "Invalid" }); }
+            res.json({ message: "Access Granted", username: user.username, settings: user.settings });
+        } else { res.status(401).json({ error: "Invalid Credentials" }); }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -117,11 +146,8 @@ io.on('connection', (socket) => {
     
     socket.on('send_message', async (data) => {
         try {
-            // Check if receiver has blocked sender before delivering
             const receiverDoc = await User.findOne({ username: data.receiver });
-            if (receiverDoc && receiverDoc.blockedUsers.includes(data.sender)) {
-                return; // Silent fail for blocked senders
-            }
+            if (receiverDoc && receiverDoc.blockedUsers.includes(data.sender)) return;
 
             const newMessage = await Message.create(data);
             io.to(data.receiver).emit('receive_message', newMessage);
@@ -129,6 +155,7 @@ io.on('connection', (socket) => {
         } catch (err) { console.error(err); }
     });
 
-    socket.on('call_user', (data) => io.to(data.userToCall).emit('incoming_call', data));
-    socket.on('answer_call', (data) => io.to(data.to).emit('call_accepted', data.signal));
+    socket.on('send_like', (data) => {
+        io.to(data.owner).emit('receive_like', { sender: data.sender, owner: data.owner });
+    });
 });
