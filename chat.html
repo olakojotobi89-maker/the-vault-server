@@ -18,51 +18,64 @@
             background: var(--primary-gradient);
             font-family: -apple-system, sans-serif;
             display: flex; justify-content: center; align-items: center;
+            overflow: hidden;
         }
 
         .main-wrapper {
             width: 98vw; height: 95vh; max-width: 1000px;
-            display: flex; background: rgba(0,0,0,0.3);
-            backdrop-filter: blur(20px); border-radius: 30px;
+            display: flex; background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(25px); border-radius: 30px;
             overflow: hidden; border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
         }
 
-        /* --- SIDEBAR / INBOX --- */
+        /* --- SIDEBAR --- */
         .inbox-sidebar {
             width: 300px; border-right: 1px solid rgba(255,255,255,0.1);
             display: flex; flex-direction: column; background: rgba(0,0,0,0.2);
+            transition: 0.3s ease;
         }
-        .inbox-header { padding: 20px; font-weight: bold; font-size: 1.2rem; border-bottom: 1px solid rgba(255,255,255,0.1); color: white; }
+        .inbox-header { padding: 25px 20px; font-weight: bold; font-size: 1.4rem; color: white; border-bottom: 1px solid rgba(255,255,255,0.1); }
         
-        .user-list { flex: 1; overflow-y: auto; }
+        .user-list { flex: 1; overflow-y: auto; scrollbar-width: none; }
+        .user-list::-webkit-scrollbar { display: none; }
+        
         .user-item {
             padding: 15px 20px; display: flex; align-items: center; gap: 12px;
-            cursor: pointer; transition: 0.3s; color: white; border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer; transition: 0.2s; color: white;
         }
         .user-item:hover { background: rgba(255,255,255,0.1); }
-        .user-item.active { background: rgba(255,255,255,0.2); border-left: 4px solid #fdbb2d; }
-        .user-avatar { width: 45px; height: 45px; background: #eee; border-radius: 50%; color: #333; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .user-item.active { background: rgba(255,255,255,0.15); border-left: 4px solid #fdbb2d; }
+        .user-avatar { width: 45px; height: 45px; background: white; border-radius: 50%; color: #333; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; }
 
         /* --- CHAT AREA --- */
-        .chat-area { flex: 1; display: flex; flex-direction: column; background: rgba(255,255,255,0.05); position: relative; }
+        .chat-area { flex: 1; display: flex; flex-direction: column; position: relative; }
         .chat-header { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); color: white; }
         
-        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .message { max-width: 70%; padding: 10px 15px; border-radius: 18px; font-size: 14px; position: relative; color: white; }
-        .sent { align-self: flex-end; background: #004a99; border-bottom-right-radius: 2px; }
-        .received { align-self: flex-start; background: rgba(255,255,255,0.2); border-bottom-left-radius: 2px; }
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; scrollbar-width: none; }
+        .message { 
+            max-width: 75%; padding: 12px 16px; border-radius: 20px; font-size: 14px; 
+            position: relative; color: white; cursor: pointer; animation: fadeIn 0.3s ease;
+        }
+        .sent { align-self: flex-end; background: #004a99; border-bottom-right-radius: 4px; }
+        .received { align-self: flex-start; background: rgba(255,255,255,0.2); border-bottom-left-radius: 4px; }
 
-        .chat-input-area { padding: 20px; display: flex; gap: 10px; align-items: center; }
-        .input-box { flex: 1; background: white; border-radius: 25px; padding: 10px 20px; display: flex; align-items: center; }
-        .input-box input { border: none; outline: none; width: 100%; font-size: 14px; }
+        .chat-input-area { padding: 20px; display: flex; gap: 12px; align-items: center; background: rgba(0,0,0,0.1); }
+        .input-box { flex: 1; background: white; border-radius: 30px; padding: 5px 15px; display: flex; align-items: center; gap: 10px; }
+        .input-box input { border: none; outline: none; flex: 1; padding: 10px; font-size: 15px; }
         
-        .block-btn { color: #ff4b2b; font-size: 0.8rem; cursor: pointer; border: 1px solid #ff4b2b; padding: 5px 10px; border-radius: 10px; }
+        .mic-btn { color: #555; font-size: 1.2rem; cursor: pointer; }
+        .mic-btn.recording { color: #ff4b2b; animation: pulse 1s infinite; }
 
-        /* Mobile Responsiveness */
+        .block-btn { color: #ff4b2b; font-size: 0.8rem; cursor: pointer; border: 1px solid #ff4b2b; padding: 6px 12px; border-radius: 20px; font-weight: bold; }
+        .block-btn.unblock { color: #00ff88; border-color: #00ff88; }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
         @media (max-width: 768px) {
-            .inbox-sidebar { width: 100%; position: absolute; z-index: 10; height: 100%; transition: 0.3s; }
+            .inbox-sidebar { width: 100%; position: absolute; z-index: 10; height: 100%; }
             .inbox-sidebar.hidden { transform: translateX(-100%); }
-            .chat-area { width: 100%; }
         }
     </style>
 </head>
@@ -70,36 +83,33 @@
 
 <div class="main-wrapper">
     <div class="inbox-sidebar" id="sidebar">
-        <div class="inbox-header">Messages</div>
-        <div class="user-list" id="user-list">
-            <p style="text-align: center; opacity: 0.5; padding: 20px;">Loading friends...</p>
-        </div>
+        <div class="inbox-header">Vault Inbox</div>
+        <div class="user-list" id="user-list"></div>
     </div>
 
     <div class="chat-area">
-        <div class="chat-header">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <button onclick="toggleSidebar()" id="backToInbox" style="display:none; background:none; border:none; color:white;"><i class="fas fa-chevron-left"></i></button>
-                <div id="header-name" style="font-weight: bold;">Select a chat</div>
+        <div class="chat-header" id="chat-header" style="visibility: hidden;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <button onclick="toggleSidebar()" style="background:none; border:none; color:white; font-size: 1.2rem;"><i class="fas fa-arrow-left"></i></button>
+                <div id="header-name" style="font-weight: bold;">User</div>
             </div>
-            <div id="block-zone" style="display: none;">
-                <span class="block-btn" onclick="toggleBlock()">Block User</span>
-            </div>
+            <span class="block-btn" id="blockBtn" onclick="handleBlock()">Block</span>
         </div>
 
         <div class="chat-messages" id="chatBox">
-            <div style="margin: auto; text-align: center; opacity: 0.5;">
-                <i class="fas fa-lock" style="font-size: 3rem; margin-bottom: 10px;"></i>
-                <p>Private Vault Encryption Active</p>
+            <div style="margin: auto; text-align: center; color: white; opacity: 0.6;">
+                <i class="fas fa-shield-alt" style="font-size: 4rem; margin-bottom: 15px;"></i>
+                <h3>End-to-End Encrypted</h3>
+                <p>Select a friend to start vaulting.</p>
             </div>
         </div>
 
         <div class="chat-input-area" id="input-area" style="display: none;">
             <div class="input-box">
-                <input type="text" id="msgInput" placeholder="Write a message...">
-                <i class="fas fa-microphone" id="micBtn" style="color: #666; cursor: pointer;"></i>
+                <input type="text" id="msgInput" placeholder="Enter message...">
+                <i class="fas fa-microphone mic-btn" id="micBtn"></i>
             </div>
-            <button onclick="sendMessage()" style="background:#fdbb2d; border:none; width:40px; height:40px; border-radius:50%; cursor:pointer;">
+            <button onclick="sendMessage()" style="background:#fdbb2d; border:none; width:45px; height:45px; border-radius:50%; cursor:pointer;">
                 <i class="fas fa-paper-plane"></i>
             </button>
         </div>
@@ -110,86 +120,144 @@
     const socket = io();
     const loggedInUser = localStorage.getItem('vault_username');
     let activeChat = null;
+    let isBlocked = false;
 
-    // 1. Load your following list (Friends)
+    // 1. LOAD FRIENDS
     async function loadFriends() {
         const res = await fetch(`/api/profile/${loggedInUser}`);
-        const data = await res.json();
+        const user = await res.json();
         const listDiv = document.getElementById('user-list');
         listDiv.innerHTML = "";
 
-        data.following.forEach(friend => {
+        user.following.forEach(friend => {
             const item = document.createElement('div');
-            item.className = 'user-item';
-            item.innerHTML = `
-                <div class="user-avatar">${friend.charAt(0).toUpperCase()}</div>
-                <div>${friend}</div>
-            `;
+            item.className = `user-item ${activeChat === friend ? 'active' : ''}`;
+            item.innerHTML = `<div class="user-avatar">${friend[0].toUpperCase()}</div><div>${friend}</div>`;
             item.onclick = () => selectUser(friend);
             listDiv.appendChild(item);
         });
     }
 
-    // 2. Switch to a specific user
+    // 2. SELECT USER & LOAD HISTORY
     async function selectUser(username) {
         activeChat = username;
+        document.getElementById('chat-header').style.visibility = 'visible';
         document.getElementById('header-name').innerText = username;
         document.getElementById('input-area').style.display = 'flex';
-        document.getElementById('block-zone').style.display = 'block';
         
-        if(window.innerWidth < 768) toggleSidebar(); // Hide sidebar on mobile
+        // Check block status
+        const res = await fetch(`/api/profile/${loggedInUser}`);
+        const me = await res.json();
+        isBlocked = me.blockedUsers.includes(username);
+        updateBlockUI();
 
+        if(window.innerWidth < 768) toggleSidebar();
+        
         socket.emit('join_private', loggedInUser);
         loadChatHistory();
+        loadFriends(); // Refresh active state in sidebar
     }
 
     async function loadChatHistory() {
         const res = await fetch(`/api/chat/${loggedInUser}/${activeChat}`);
-        const history = await res.json();
+        const messages = await res.json();
         const chatBox = document.getElementById('chatBox');
         chatBox.innerHTML = "";
-        history.forEach(msg => {
-            appendMessage(msg.content, msg.sender === loggedInUser ? 'sent' : 'received');
-        });
+        messages.forEach(msg => appendMessage(msg));
     }
 
-    function appendMessage(content, type) {
+    function appendMessage(msg) {
         const chatBox = document.getElementById('chatBox');
-        const msg = document.createElement('div');
-        msg.className = `message ${type}`;
-        msg.innerText = content;
-        chatBox.appendChild(msg);
+        const div = document.createElement('div');
+        div.className = `message ${msg.sender === loggedInUser ? 'sent' : 'received'}`;
+        
+        if (msg.type === 'voice') {
+            div.innerHTML = `<i class="fas fa-play"></i> Voice Note <small style="display:block; opacity:0.6;">Click to play</small>`;
+            div.onclick = () => new Audio(msg.content).play();
+        } else {
+            div.innerText = msg.content;
+        }
+
+        // Long press to delete
+        div.oncontextmenu = (e) => {
+            e.preventDefault();
+            if(msg.sender === loggedInUser && confirm("Delete for everyone?")) deleteMsg(msg._id, div);
+        };
+
+        chatBox.appendChild(div);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
+    // 3. SENDING LOGIC
     function sendMessage() {
         const input = document.getElementById('msgInput');
-        if(!input.value.trim() || !activeChat) return;
-        
-        socket.emit('send_message', {
-            sender: loggedInUser,
-            receiver: activeChat,
-            content: input.value,
-            type: 'text'
-        });
+        if(!input.value.trim()) return;
+        socket.emit('send_message', { sender: loggedInUser, receiver: activeChat, content: input.value, type: 'text' });
         input.value = "";
     }
 
-    function toggleSidebar() {
-        document.getElementById('sidebar').classList.toggle('hidden');
-        document.getElementById('backToInbox').style.display = 
-            document.getElementById('sidebar').classList.contains('hidden') ? 'block' : 'none';
+    async function deleteMsg(id, el) {
+        await fetch('/api/delete-message', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ messageId: id, username: loggedInUser })
+        });
+        el.remove();
     }
 
-    // BLOCK LOGIC
-    async function toggleBlock() {
-        if(!confirm(`Block ${activeChat}? You will no longer receive messages.`)) return;
-        // Add your block API call here
-        alert(`${activeChat} has been blocked.`);
+    // 4. BLOCKING LOGIC
+    async function handleBlock() {
+        const res = await fetch('/api/block-user', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ myUsername: loggedInUser, targetUsername: activeChat })
+        });
+        const data = await res.json();
+        isBlocked = data.isBlocked;
+        updateBlockUI();
     }
+
+    function updateBlockUI() {
+        const btn = document.getElementById('blockBtn');
+        btn.innerText = isBlocked ? "Unblock" : "Block";
+        btn.className = isBlocked ? "block-btn unblock" : "block-btn";
+    }
+
+    // 5. VOICE NOTE LOGIC
+    let mediaRecorder;
+    let chunks = [];
+    const micBtn = document.getElementById('micBtn');
+
+    micBtn.onmousedown = async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.start();
+        micBtn.classList.add('recording');
+        mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = () => {
+                socket.emit('send_message', { sender: loggedInUser, receiver: activeChat, content: reader.result, type: 'voice' });
+            };
+            chunks = [];
+        };
+    };
+    micBtn.onmouseup = () => {
+        mediaRecorder.stop();
+        micBtn.classList.remove('recording');
+    };
+
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('hidden');
+    }
+
+    socket.on('receive_message', (data) => {
+        if(data.sender === activeChat || data.sender === loggedInUser) appendMessage(data);
+    });
 
     loadFriends();
 </script>
-
 </body>
 </html>
