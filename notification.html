@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Vault | Discover</title>
+    <title>Vault | Activity</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root { --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); }
@@ -14,46 +14,35 @@
         }
         .container { width: 95%; max-width: 500px; margin: auto; padding: 20px 0 100px; }
 
-        /* Instagram Style Search Bar */
-        .search-container {
-            position: sticky; top: 10px; z-index: 100;
-            background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(25px);
-            border-radius: 15px; padding: 12px 18px;
-            display: flex; align-items: center; gap: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 25px;
+        .header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 10px; margin-bottom: 20px; 
         }
-        .search-container input {
-            flex: 1; background: none; border: none; color: white;
-            font-size: 16px; outline: none;
-        }
-        .search-container input::placeholder { color: rgba(255,255,255,0.6); }
-
-        /* User List Style */
-        .user-item {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 12px 10px; transition: 0.2s; cursor: pointer;
-            border-radius: 15px;
-        }
-        .user-item:active { background: rgba(255, 255, 255, 0.1); }
-
-        .user-meta { display: flex; align-items: center; gap: 15px; }
         
-        /* Profile Image logic */
-        .pfp-circle {
-            width: 55px; height: 55px; border-radius: 50%;
-            background: #222; border: 2px solid #fdbb2d;
-            display: flex; align-items: center; justify-content: center;
-            overflow: hidden; object-fit: cover;
+        .notif-card {
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px);
+            border-radius: 18px; padding: 15px; margin-bottom: 10px;
+            display: flex; align-items: center; gap: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: slideIn 0.3s ease;
         }
-        .pfp-circle img { width: 100%; height: 100%; object-fit: cover; }
 
-        .username-text { font-weight: 700; font-size: 15px; display: block; }
-        .sub-text { font-size: 12px; opacity: 0.6; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; } }
 
-        .follow-btn {
-            background: white; color: black; border: none;
-            padding: 7px 20px; border-radius: 10px;
-            font-size: 13px; font-weight: 700;
+        .pfp-mini {
+            width: 45px; height: 45px; border-radius: 50%;
+            background: #222; border: 1.5px solid #fdbb2d;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .pfp-mini img { width: 100%; height: 100%; object-fit: cover; }
+
+        .notif-content { flex: 1; font-size: 14px; }
+        .user-link { font-weight: 800; color: #fdbb2d; text-decoration: none; }
+        .time-ago { font-size: 11px; opacity: 0.5; display: block; margin-top: 3px; }
+
+        .action-btn {
+            background: #fdbb2d; color: black; border: none;
+            padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: bold;
         }
 
         .nav-bottom {
@@ -63,68 +52,65 @@
             border-radius: 30px; padding: 15px 30px; display: flex;
             justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1);
         }
-        .nav-item { color: white; opacity: 0.5; font-size: 20px; text-decoration: none; }
-        .active { opacity: 1; color: #fdbb2d; }
     </style>
 </head>
 <body>
 
+    <audio id="notifSound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3"></audio>
+
     <div class="container">
-        <h2 style="padding-left: 10px; margin-bottom: 20px;">Explore</h2>
-        
-        <div class="search-container">
-            <i class="fas fa-search" style="opacity: 0.6;"></i>
-            <input type="text" id="userSearch" placeholder="Search users..." oninput="doSearch()">
+        <div class="header">
+            <h2 style="margin:0;">Activity</h2>
+            <span style="font-size: 12px; opacity: 0.6;" onclick="clearNotifications()">Clear All</span>
         </div>
 
-        <div id="results">
+        <div id="notification-list">
             </div>
     </div>
 
     <nav class="nav-bottom">
-        <a href="home.html" class="nav-item"><i class="fas fa-home"></i></a>
-        <a href="search.html" class="nav-item active"><i class="fas fa-search"></i></a>
-        <a href="chat.html" class="nav-item"><i class="fas fa-comment-alt"></i></a>
-        <a href="profile.html" class="nav-item"><i class="fas fa-user"></i></a>
+        <a href="home.html" style="color:white; opacity:0.6;"><i class="fas fa-home"></i></a>
+        <a href="search.html" style="color:white; opacity:0.6;"><i class="fas fa-search"></i></a>
+        <a href="chat.html" style="color:white; opacity:0.6;"><i class="fas fa-comment-alt"></i></a>
+        <a href="notification.html" style="color:#fdbb2d;"><i class="fas fa-bell"></i></a>
     </nav>
 
     <script>
-        async function doSearch() {
-            const q = document.getElementById('userSearch').value;
-            const resultsDiv = document.getElementById('results');
+        const myName = localStorage.getItem('vault_username');
 
-            if (q.length < 1) {
-                resultsDiv.innerHTML = '';
-                return;
-            }
-
+        async function loadNotifications() {
+            const list = document.getElementById('notification-list');
             try {
-                const res = await fetch(`/api/users/search?q=${q}`);
-                const users = await res.json();
+                const res = await fetch(`/api/notifications/${myName}`);
+                const data = await res.json();
 
-                resultsDiv.innerHTML = users.map(user => {
-                    // Check if they have a real profile pic, otherwise show first letter
-                    const avatar = user.profilePic 
-                        ? `<img src="${user.profilePic}">` 
-                        : `<span style="font-size:20px; color:#fdbb2d;">${user.username[0].toUpperCase()}</span>`;
+                if (data.length === 0) {
+                    list.innerHTML = '<div style="text-align:center; margin-top:100px; opacity:0.4;">No new activity</div>';
+                    return;
+                }
+
+                list.innerHTML = data.map(n => {
+                    let message = "interacted with your vault.";
+                    if(n.type === 'like') message = "liked your post.";
+                    if(n.type === 'follow') message = "started following you.";
 
                     return `
-                        <div class="user-item" onclick="window.location.href='profile.html?user=${user.username}'">
-                            <div class="user-meta">
-                                <div class="pfp-circle">${avatar}</div>
-                                <div>
-                                    <span class="username-text">${user.username} <i class="fas fa-check-circle" style="color:#3897f0; font-size:12px;"></i></span>
-                                    <span class="sub-text">Vault Member</span>
-                                </div>
+                        <div class="notif-card" onclick="window.location.href='profile.html?user=${n.fromUser}'">
+                            <div class="pfp-mini">
+                                <span>${n.fromUser[0].toUpperCase()}</span>
                             </div>
-                            <button class="follow-btn">View</button>
+                            <div class="notif-content">
+                                <span class="user-link">${n.fromUser}</span> ${message}
+                                <span class="time-ago">${new Date(n.timestamp).toLocaleString()}</span>
+                            </div>
+                            <button class="action-btn">View</button>
                         </div>
                     `;
                 }).join('');
-            } catch (err) {
-                console.error("Search failed:", err);
-            }
+            } catch (err) { console.error(err); }
         }
+
+        loadNotifications();
     </script>
 </body>
 </html>
