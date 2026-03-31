@@ -187,13 +187,16 @@
 
                 if (profileUser === myName) {
                     eBtn.style.display = 'inline-block';
-                    lBtn.style.display = 'inline-block'; // Show logout on own profile
+                    lBtn.style.display = 'inline-block';
                     document.getElementById('pfp-hint').style.display = 'block';
                 } else {
                     fBtn.style.display = 'inline-block';
                     if (userData.followers && userData.followers.includes(myName)) {
                         fBtn.innerText = "Following";
                         fBtn.classList.add('following');
+                    } else {
+                        fBtn.innerText = "Follow";
+                        fBtn.classList.remove('following');
                     }
                 }
 
@@ -201,7 +204,6 @@
             } catch (err) { console.error(err); }
         }
 
-        // LOGOUT LOGIC
         function logout() {
             localStorage.removeItem('vault_username');
             localStorage.removeItem('vault_settings');
@@ -278,7 +280,7 @@
             document.getElementById('edit-bio-input').value = document.getElementById('display-bio').innerText === "No bio yet." ? "" : document.getElementById('display-bio').innerText;
             document.getElementById('save-btn').style.display = 'inline-block';
             document.getElementById('edit-btn').style.display = 'none';
-            document.getElementById('logout-btn').style.display = 'none'; // Hide logout while editing
+            document.getElementById('logout-btn').style.display = 'none';
         }
 
         async function saveBio() {
@@ -312,26 +314,27 @@
             };
         }
 
+        // FIXED: Using 'me' to match server.js requirements
         async function handleFollow() {
             const fBtn = document.getElementById('follow-btn');
             try {
                 const res = await fetch('/api/follow', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ follower: myName, target: profileUser })
+                    body: JSON.stringify({ me: myName, target: profileUser })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    if (data.isFollowing) {
+                    if (data.following) {
                         fBtn.innerText = "Following";
                         fBtn.classList.add('following');
                     } else {
                         fBtn.innerText = "Follow";
                         fBtn.classList.remove('following');
                     }
-                    initProfile();
+                    initProfile(); // Refresh followers count immediately
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) { console.error("Follow error:", e); }
         }
 
         initProfile();
