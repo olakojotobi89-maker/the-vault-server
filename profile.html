@@ -66,6 +66,14 @@
         .follow-btn { background: #fdbb2d; color: black; border: none; }
         .follow-btn.following { background: rgba(255,255,255,0.2); color: white; }
 
+        /* Logout Button Specific Style */
+        .logout-btn { 
+            border: 1px solid rgba(255, 75, 43, 0.5); 
+            color: #ff4b2b;
+            margin-top: 10px;
+        }
+        .logout-btn:hover { background: rgba(255, 75, 43, 0.1); }
+
         /* Stats Row */
         .stats { display: flex; justify-content: space-around; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
         .stat-item { text-align: center; }
@@ -131,6 +139,7 @@
                 <button id="edit-btn" class="action-btn" onclick="toggleEdit()" style="display:none">Edit Profile</button>
                 <button id="follow-btn" class="action-btn follow-btn" onclick="handleFollow()" style="display:none">Follow</button>
                 <button id="save-btn" class="action-btn" onclick="saveBio()" style="display:none; background: #fdbb2d; color: black;">Save Changes</button>
+                <button id="logout-btn" class="action-btn logout-btn" onclick="logout()" style="display:none">Logout</button>
             </div>
 
             <div class="stats">
@@ -158,7 +167,6 @@
 
         async function initProfile() {
             try {
-                // 1. Load Profile Data
                 const userRes = await fetch(`/api/profile/${profileUser}`);
                 const userData = await userRes.json();
 
@@ -173,12 +181,13 @@
                     document.getElementById('pfp-target').innerHTML = `<div style="font-size: 40px;">${profileUser.charAt(0).toUpperCase()}</div>`;
                 }
 
-                // 2. Control Button Visibility
                 const fBtn = document.getElementById('follow-btn');
                 const eBtn = document.getElementById('edit-btn');
+                const lBtn = document.getElementById('logout-btn');
 
                 if (profileUser === myName) {
                     eBtn.style.display = 'inline-block';
+                    lBtn.style.display = 'inline-block'; // Show logout on own profile
                     document.getElementById('pfp-hint').style.display = 'block';
                 } else {
                     fBtn.style.display = 'inline-block';
@@ -190,6 +199,13 @@
 
                 loadPosts();
             } catch (err) { console.error(err); }
+        }
+
+        // LOGOUT LOGIC
+        function logout() {
+            localStorage.removeItem('vault_username');
+            localStorage.removeItem('vault_settings');
+            window.location.href = 'index.html';
         }
 
         async function loadPosts() {
@@ -262,6 +278,7 @@
             document.getElementById('edit-bio-input').value = document.getElementById('display-bio').innerText === "No bio yet." ? "" : document.getElementById('display-bio').innerText;
             document.getElementById('save-btn').style.display = 'inline-block';
             document.getElementById('edit-btn').style.display = 'none';
+            document.getElementById('logout-btn').style.display = 'none'; // Hide logout while editing
         }
 
         async function saveBio() {
