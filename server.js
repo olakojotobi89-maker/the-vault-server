@@ -23,7 +23,6 @@ app.use(express.static(path.join(__dirname)));
 
 // --- RENDER ROUTING ---
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-// FIX: Added route for login.html to point to index.html
 app.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/home.html', (req, res) => res.sendFile(path.join(__dirname, 'home.html')));
 app.get('/notification.html', (req, res) => res.sendFile(path.join(__dirname, 'notification.html')));
@@ -53,7 +52,7 @@ const User = mongoose.model('User', new mongoose.Schema({
 
 const Post = mongoose.model('Post', new mongoose.Schema({
     sender: { type: String, required: true, index: true },
-    senderPfp: { type: String, default: "" }, // FIX: Store PFP at time of post
+    senderPfp: { type: String, default: "" },
     caption: String,
     media: String, 
     type: { type: String, default: 'image' }, 
@@ -82,7 +81,37 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// FIX: Search endpoint
+// FIX: ADDED FOLLOW/UNFOLLOW PERSISTENCE
+app.post('/api/follow', async (req, res) => {
+    const { me, target } = req.body;
+    try {
+        const myUser = await User.findOne({ username: me });
+        const targetUser = await User.findOne({ username: target });
+        if (!myUser || !targetUser) return res.status(404).json({ error: "User not found" });
+
+        if (!myUser.following.includes(target)) {
+            myUser.following.push(target);
+            targetUser.followers.push(me);
+            await Notification.create({ toUser: target, fromUser: me, type: 'follow' });
+        } else {
+            myUser.following = myUser.following.filter(u => u !== target);
+            targetUser.followers = targetUser.followers.filter(u => u !== me);
+        }
+        await myUser.save();
+        await targetUser.save();
+        res.json({ success: true, following: myUser.following.includes(target) });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// FIX: ADDED FOLLOW STATUS CHECK
+app.get('/api/follow-status/:me/:target', async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.me });
+        const isFollowing = user ? user.following.includes(req.params.target) : false;
+        res.json({ isFollowing });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/users/search', async (req, res) => {
     const query = req.query.q;
     if (!query) return res.json([]);
@@ -94,7 +123,6 @@ app.get('/api/users/search', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Search failed" }); }
 });
 
-// FIX: Profile endpoint
 app.get('/api/profile/:username', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.params.username }).select('-password');
@@ -103,7 +131,6 @@ app.get('/api/profile/:username', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// FIX: Update settings (Bio/PFP)
 app.post('/api/update-settings', async (req, res) => {
     try {
         const { username, settings } = req.body;
@@ -119,14 +146,10 @@ app.get('/api/posts', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// FIX: Create post with User Profile Pic
 app.post('/api/posts', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.body.sender });
-        const postData = {
-            ...req.body,
-            senderPfp: user ? user.profilePic : ""
-        };
+        const postData = { ...req.body, senderPfp: user ? user.profilePic : "" };
         const post = await Post.create(postData);
         res.json(post);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -175,7 +198,6 @@ app.get('/api/chat-list/:username', async (req, res) => {
         });
 
         const users = await User.find({ username: { $in: Array.from(partners) } }).select('username profilePic');
-        
         const chatList = await Promise.all(users.map(async (u) => {
             const unreadCount = await Message.countDocuments({
                 sender: u.username, receiver: username, seen: false
@@ -202,7 +224,6 @@ app.get('/api/messages/:me/:target', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// FIX: ADDED MISSING SIGNUP ROUTE
 app.post('/api/signup', async (req, res) => {
     try {
         const hashedPassword = await bcrypt.hash(req.body.password, 10);
