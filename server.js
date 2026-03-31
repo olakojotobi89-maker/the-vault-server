@@ -23,6 +23,8 @@ app.use(express.static(path.join(__dirname)));
 
 // --- RENDER ROUTING ---
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+// FIX: Added route for login.html to point to index.html
+app.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/home.html', (req, res) => res.sendFile(path.join(__dirname, 'home.html')));
 app.get('/notification.html', (req, res) => res.sendFile(path.join(__dirname, 'notification.html')));
 app.get('/search.html', (req, res) => res.sendFile(path.join(__dirname, 'search.html')));
