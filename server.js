@@ -81,7 +81,6 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// FIX: ATOMIC FOLLOW/UNFOLLOW PERSISTENCE
 app.post('/api/follow', async (req, res) => {
     const { me, target } = req.body;
     if (!me || !target) return res.status(400).json({ error: "Missing usernames" });
@@ -93,17 +92,44 @@ app.post('/api/follow', async (req, res) => {
         const isFollowing = myUser.following.includes(target);
 
         if (!isFollowing) {
-            // Use $addToSet to prevent duplicates and ensure persistence
             await User.updateOne({ username: me }, { $addToSet: { following: target } });
             await User.updateOne({ username: target }, { $addToSet: { followers: me } });
-            await Notification.create({ toUser: target, fromUser: me, type: 'follow' });
+            
+            // Create DB Notification
+            const notif = await Notification.create({ toUser: target, fromUser: me, type: 'follow' });
+            
+            // Trigger Real-time Sound/Badge
+            io.to(target).emit('receive_notification', notif);
+            
             res.json({ success: true, following: true });
         } else {
-            // Use $pull to remove accurately
             await User.updateOne({ username: me }, { $pull: { following: target } });
             await User.updateOne({ username: target }, { $pull: { followers: me } });
             res.json({ success: true, following: false });
         }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/posts/:id/like', async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
+        if (!post.likedBy.includes(req.body.username)) {
+            post.likedBy.push(req.body.username);
+            post.likes += 1;
+            await post.save();
+
+            // Create DB Notification
+            const notif = await Notification.create({ 
+                toUser: post.sender, 
+                fromUser: req.body.username, 
+                type: 'like' 
+            });
+
+            // Trigger Real-time Sound/Badge
+            io.to(post.sender).emit('receive_notification', notif);
+
+            res.json({ success: true });
+        } else { res.json({ message: "Already liked" }); }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -165,18 +191,6 @@ app.delete('/api/posts/:id', async (req, res) => {
             await Post.findByIdAndDelete(req.params.id);
             res.json({ success: true });
         } else { res.status(403).json({ error: "Unauthorized" }); }
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/posts/:id/like', async (req, res) => {
-    try {
-        const post = await Post.findById(req.params.id);
-        if (!post.likedBy.includes(req.body.username)) {
-            post.likedBy.push(req.body.username);
-            post.likes += 1;
-            await post.save();
-            res.json({ success: true });
-        } else { res.json({ message: "Already liked" }); }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -258,7 +272,11 @@ app.get('/api/notifications/:username', async (req, res) => {
 
 // --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
-    socket.on('join_private', (username) => socket.join(username));
+    socket.on('join_private', (username) => {
+        socket.join(username);
+        console.log(`📡 User ${username} connected for notifications.`);
+    });
+
     socket.on('send_message', async (data) => {
         try {
             const newMessage = await Message.create(data);
@@ -267,6 +285,7 @@ io.on('connection', (socket) => {
             io.to(data.receiver).emit('update_badge'); 
         } catch (err) { console.error(err); }
     });
+
     socket.on('send_like', (data) => {
         io.to(data.owner).emit('receive_like', { sender: data.sender, owner: data.owner });
     });
