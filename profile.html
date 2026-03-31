@@ -182,7 +182,6 @@
                     document.getElementById('pfp-hint').style.display = 'block';
                 } else {
                     fBtn.style.display = 'inline-block';
-                    // Check if already following
                     if (userData.followers && userData.followers.includes(myName)) {
                         fBtn.innerText = "Following";
                         fBtn.classList.add('following');
@@ -198,9 +197,7 @@
                 const postRes = await fetch(`/api/posts`);
                 const allPosts = await postRes.json();
                 
-                // Filter posts ONLY for this profile user
                 const posts = allPosts.filter(p => p.sender === profileUser);
-                
                 const grid = document.getElementById('profile-grid');
                 grid.innerHTML = '';
                 
@@ -219,7 +216,7 @@
                             ? `${icon}<video src="${post.media}"></video>` 
                             : `<img src="${post.media}">`;
                     } else {
-                        item.innerHTML = `<div class="grid-text">${post.caption ? post.caption.substring(0, 30) : "Post"}...</div>`;
+                        item.innerHTML = `<div class="grid-text">${post.caption ? post.caption.substring(0, 35) : "View Post"}...</div>`;
                     }
                     grid.appendChild(item);
                 });
@@ -257,13 +254,12 @@
 
         function closeModal() {
             document.getElementById('post-modal').style.display = 'none';
-            document.getElementById('modal-render').innerHTML = ''; 
         }
 
         function toggleEdit() {
             document.getElementById('display-bio').style.display = 'none';
             document.getElementById('edit-bio-input').style.display = 'block';
-            document.getElementById('edit-bio-input').value = document.getElementById('display-bio').innerText;
+            document.getElementById('edit-bio-input').value = document.getElementById('display-bio').innerText === "No bio yet." ? "" : document.getElementById('display-bio').innerText;
             document.getElementById('save-btn').style.display = 'inline-block';
             document.getElementById('edit-btn').style.display = 'none';
         }
@@ -277,7 +273,7 @@
                     body: JSON.stringify({ username: myName, settings: { bio: newBio } })
                 });
                 if (res.ok) window.location.reload();
-            } catch(e) { alert("Save failed"); }
+            } catch(e) { console.error("Save failed"); }
         }
 
         function triggerPfpUpload() {
@@ -308,7 +304,6 @@
                     body: JSON.stringify({ follower: myName, target: profileUser })
                 });
                 const data = await res.json();
-                
                 if (data.success) {
                     if (data.isFollowing) {
                         fBtn.innerText = "Following";
@@ -317,7 +312,6 @@
                         fBtn.innerText = "Follow";
                         fBtn.classList.remove('following');
                     }
-                    // Refresh stats after follow action
                     initProfile();
                 }
             } catch(e) { console.error(e); }
