@@ -1,66 +1,132 @@
-<style>
-    /* Add this to your existing styles to make the badge look clean */
-    .chat-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 15px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        cursor: pointer;
-        transition: background 0.3s;
-    }
-    .chat-item:hover { background: rgba(255, 255, 255, 0.05); }
-    
-    .chat-info { display: flex; align-items: center; gap: 12px; }
-    
-    .unread-badge {
-        background: #fdbb2d; /* Your primary gold/yellow */
-        color: #000;
-        font-size: 11px;
-        font-weight: bold;
-        min-width: 18px;
-        height: 18px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0 5px;
-    }
-</style>
-
-<div class="container">
-    <h2>Messages</h2>
-    <div id="chat-partners-list">
-        </div>
-</div>
-
-<script>
-    const myName = localStorage.getItem('vault_username');
-
-    async function loadChatList() {
-        try {
-            const res = await fetch(`/api/chat-list/${myName}`);
-            const users = await res.json();
-            const list = document.getElementById('chat-partners-list');
-            
-            list.innerHTML = users.map(user => `
-                <div class="chat-item" onclick="location.href='direct.html?user=${user.username}'">
-                    <div class="chat-info">
-                        <img src="${user.profilePic || 'default-pfp.png'}" class="pfp" style="width:45px; height:45px; border-radius:50%; border: 1px solid rgba(255,255,255,0.2);">
-                        <span style="font-weight: 500;">${user.username}</span>
-                    </div>
-                    
-                    ${user.unreadCount > 0 ? `
-                        <div class="unread-badge">${user.unreadCount}</div>
-                    ` : ''}
-                </div>
-            `).join('');
-        } catch (err) {
-            console.error("Failed to load inbox:", err);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Vault | Messages</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { 
+            --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); 
+            --glass: rgba(255, 255, 255, 0.1);
         }
-    }
 
-    // Load immediately and refresh every 10 seconds for real-time feel
-    loadChatList();
-    setInterval(loadChatList, 10000);
-</script>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            margin: 0; padding: 0; min-height: 100dvh;
+            background: var(--primary-gradient);
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            color: white; display: flex; justify-content: center;
+        }
+
+        .container { width: 95%; max-width: 500px; padding: 20px 0 100px; }
+
+        .header {
+            display: flex; align-items: center; gap: 15px; margin-bottom: 25px;
+            padding: 0 10px;
+        }
+        .back-btn { color: white; font-size: 20px; text-decoration: none; opacity: 0.8; }
+
+        .glass-card {
+            background: var(--glass); backdrop-filter: blur(20px);
+            border-radius: 25px; border: 1px solid rgba(255, 255, 255, 0.2);
+            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .chat-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 18px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer; transition: 0.3s;
+        }
+        .chat-item:last-child { border-bottom: none; }
+        .chat-item:hover { background: rgba(255, 255, 255, 0.05); }
+        .chat-item:active { background: rgba(255, 255, 255, 0.15); transform: scale(0.98); }
+
+        .chat-info { display: flex; align-items: center; gap: 15px; }
+
+        .pfp {
+            width: 48px; height: 48px; border-radius: 50%;
+            border: 1.5px solid #fdbb2d; object-fit: cover;
+            background: #222; display: flex; align-items: center; justify-content: center;
+            font-weight: bold;
+        }
+
+        .unread-badge {
+            background: #fdbb2d; color: black;
+            font-size: 11px; font-weight: bold;
+            min-width: 20px; height: 20px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0 5px;
+        }
+
+        /* Bottom Nav */
+        .nav-bottom {
+            position: fixed; bottom: 20px; width: 90%; max-width: 400px;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(20px);
+            border-radius: 30px; padding: 15px 30px; display: flex;
+            justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1);
+            z-index: 1000;
+        }
+        .nav-item { color: white; opacity: 0.6; font-size: 20px; text-decoration: none; }
+        .nav-item.active { opacity: 1; color: #fdbb2d; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <a href="home.html" class="back-btn"><i class="fas fa-chevron-left"></i></a>
+            <h2 style="margin:0; letter-spacing: 1px;">Messages</h2>
+        </div>
+
+        <div class="glass-card" id="chat-partners-list">
+            <div style="padding: 40px; text-align: center; opacity: 0.5; font-style: italic;">
+                Opening your vault...
+            </div>
+        </div>
+    </div>
+
+    <nav class="nav-bottom">
+        <a href="home.html" class="nav-item"><i class="fas fa-home"></i></a>
+        <a href="search.html" class="nav-item"><i class="fas fa-search"></i></a>
+        <a href="chat.html" class="nav-item active"><i class="fas fa-comment-alt"></i></a>
+        <a href="profile.html" class="nav-item"><i class="fas fa-user"></i></a>
+    </nav>
+
+    <script>
+        const myName = localStorage.getItem('vault_username');
+
+        async function loadChatList() {
+            try {
+                const res = await fetch(`/api/chat-list/${myName}`);
+                const users = await res.json();
+                const list = document.getElementById('chat-partners-list');
+                
+                if (users.length === 0) {
+                    list.innerHTML = `<div style="padding: 40px; text-align: center; opacity: 0.5;">No secret chats found.</div>`;
+                    return;
+                }
+
+                list.innerHTML = users.map(user => `
+                    <div class="chat-item" onclick="location.href='direct.html?user=${user.username}'">
+                        <div class="chat-info">
+                            <img src="${user.profilePic || 'default-pfp.png'}" class="pfp">
+                            <span style="font-weight: 600;">${user.username}</span>
+                        </div>
+                        
+                        ${user.unreadCount > 0 ? `
+                            <div class="unread-badge">${user.unreadCount}</div>
+                        ` : '<i class="fas fa-chevron-right" style="opacity: 0.2; font-size: 12px;"></i>'}
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error("Failed to load inbox:", err);
+            }
+        }
+
+        loadChatList();
+        setInterval(loadChatList, 10000);
+    </script>
+</body>
+</html>
