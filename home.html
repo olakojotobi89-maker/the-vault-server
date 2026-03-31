@@ -1,81 +1,297 @@
-<div id="vault-feed">
-        <div class="search-container" style="margin-bottom: 20px;">
-            <div style="position: relative; width: 100%;">
-                <i class="fas fa-search" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); opacity: 0.5;"></i>
-                <input type="text" id="vaultSearch" placeholder="Search the Vault..." 
-                    style="width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); padding: 12px 12px 12px 45px; border-radius: 15px; color: white; outline: none; box-sizing: border-box;">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Vault | Home</title>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        if (!localStorage.getItem('vault_username')) {
+            window.location.href = 'index.html';
+        }
+    </script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); }
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            margin: 0; padding: 0; min-height: 100dvh;
+            background: var(--primary-gradient);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: white; display: flex; justify-content: center; overflow-x: hidden;
+        }
+
+        .container { width: 95%; max-width: 500px; padding: 20px 0 100px; display: flex; flex-direction: column; gap: 20px; }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px);
+            border-radius: 25px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        /* Post Box */
+        .post-box textarea {
+            width: 100%; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px; color: white; padding: 15px; font-size: 14px; resize: none; margin-bottom: 10px;
+        }
+        .post-actions { display: flex; justify-content: space-between; align-items: center; }
+        .post-btn { background: #fdbb2d; color: black; border: none; padding: 10px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        
+        /* Search */
+        .search-bar { position: relative; }
+        .search-bar input {
+            width: 100%; background: rgba(255,255,255,0.1); border: none; padding: 12px 40px;
+            border-radius: 15px; color: white; font-size: 14px;
+        }
+        .search-bar i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); opacity: 0.5; }
+
+        /* Feed */
+        .post { margin-bottom: 20px; animation: slideIn 0.4s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .post-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .user-info { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .pfp-small { width: 35px; height: 35px; border-radius: 50%; background: #222; display: flex; align-items: center; justify-content: center; border: 1.5px solid #fdbb2d; overflow: hidden; }
+        .pfp-small img { width: 100%; height: 100%; object-fit: cover; }
+
+        .post-media { width: 100%; border-radius: 20px; margin: 10px 0; overflow: hidden; background: rgba(0,0,0,0.3); }
+        .post-media img, .post-media video { width: 100%; display: block; }
+
+        .interaction { display: flex; gap: 20px; margin-top: 15px; font-size: 18px; }
+        .interaction i { cursor: pointer; transition: 0.2s; }
+        .interaction i:active { transform: scale(1.3); }
+
+        /* Navigation */
+        .nav-bottom {
+            position: fixed; bottom: 20px; width: 90%; max-width: 400px;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(20px);
+            border-radius: 30px; padding: 15px 30px; display: flex;
+            justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1);
+            z-index: 1000;
+        }
+        .nav-item { color: white; opacity: 0.6; font-size: 20px; text-decoration: none; transition: 0.3s; position: relative; }
+        .nav-item.active { opacity: 1; color: #fdbb2d; }
+        
+        /* Badge UI */
+        .badge {
+            position: absolute; top: -8px; right: -8px; background: #fdbb2d; color: black;
+            border-radius: 50%; padding: 2px 5px; font-size: 10px; font-weight: bold;
+            border: 1.5px solid #000; display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 10px;">
+            <h2 style="margin:0; letter-spacing: 1px;">VAULT</h2>
+            <div onclick="window.location.href='notification.html'" style="position: relative; cursor: pointer;">
+                <i class="fas fa-bell" style="font-size: 20px; opacity: 0.8;"></i>
+                <span id="notif-badge" class="badge">0</span>
             </div>
         </div>
 
-        <div class="post-card" style="padding: 20px; margin-bottom: 20px;">
-             <textarea id="postCaption" placeholder="Write something confidential..." 
-                style="width: 100%; background: rgba(0,0,0,0.2); border: none; border-radius: 15px; padding: 15px; color: white; resize: none; min-height: 80px; outline: none; box-sizing: border-box;"></textarea>
-             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
-                 <div style="display: flex; gap: 20px; opacity: 0.7;">
-                     <i class="fas fa-image" style="cursor: pointer;" onclick="document.getElementById('mediaInput').click()"></i>
-                     <i class="fas fa-video" style="cursor: pointer;" onclick="document.getElementById('mediaInput').click()"></i>
-                 </div>
-                 <button onclick="submitPost()" style="background: #fdbb2d; color: black; border: none; padding: 10px 30px; border-radius: 20px; font-weight: bold; cursor: pointer;">Post</button>
-             </div>
-             <input type="file" id="mediaInput" style="display: none;" onchange="previewMedia()">
-             <div id="media-preview" style="margin-top: 10px;"></div>
+        <div class="search-bar">
+            <i class="fas fa-search"></i>
+            <input type="text" id="userSearch" placeholder="Search the Vault..." onkeyup="filterFeed()">
+            <div id="search-results" style="position: absolute; width: 100%; z-index: 10;"></div>
         </div>
 
-        <div id="feed-content">
+        <div class="glass-card post-box">
+            <textarea id="postCaption" placeholder="Write something confidential..."></textarea>
+            <div class="post-actions">
+                <div style="display: flex; gap: 15px; opacity: 0.7; font-size: 18px;">
+                    <i class="fas fa-image" onclick="document.getElementById('mediaInput').click()" style="cursor:pointer"></i>
+                    <i class="fas fa-video" onclick="document.getElementById('mediaInput').click()" style="cursor:pointer"></i>
+                    <input type="file" id="mediaInput" accept="image/*,video/*" style="display:none" onchange="previewMedia()">
+                </div>
+                <button class="post-btn" onclick="submitPost()">Post</button>
             </div>
+            <div id="media-preview" style="margin-top: 10px;"></div>
+        </div>
+
+        <div id="vault-feed"></div>
     </div>
 
-    <script>
-        let allPosts = []; // Global store for search filtering
+    <nav class="nav-bottom">
+        <a href="home.html" class="nav-item active"><i class="fas fa-home"></i></a>
+        <a href="search.html" class="nav-item"><i class="fas fa-search"></i></a>
+        <a href="chat.html" class="nav-item">
+            <i class="fas fa-comment-alt"></i>
+            <span id="chat-badge" class="badge">0</span>
+        </a>
+        <a href="profile.html" class="nav-item"><i class="fas fa-user"></i></a>
+    </nav>
 
-        // --- SEARCH LOGIC ---
-        document.getElementById('vaultSearch').addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            const filtered = allPosts.filter(post => 
-                post.sender.toLowerCase().includes(term) || 
-                (post.caption && post.caption.toLowerCase().includes(term))
-            );
-            renderPosts(filtered);
-        });
+    <script>
+        const socket = io();
+        const myName = localStorage.getItem('vault_username');
+        let selectedMedia = null;
+        let mediaType = 'image';
+        let allPosts = []; // Global posts for search
+
+        socket.emit('join_private', myName);
 
         async function loadFeed() {
             try {
                 const res = await fetch('/api/posts');
                 allPosts = await res.json();
                 renderPosts(allPosts);
-            } catch (err) { console.error(err); }
+            } catch (err) { console.error("Feed Error:", err); }
+        }
+
+        // --- SEARCH FUNCTIONALITY ---
+        function filterFeed() {
+            const term = document.getElementById('userSearch').value.toLowerCase();
+            const filtered = allPosts.filter(post => 
+                post.sender.toLowerCase().includes(term) || 
+                (post.caption && post.caption.toLowerCase().includes(term))
+            );
+            renderPosts(filtered);
         }
 
         function renderPosts(posts) {
-            const container = document.getElementById('feed-content');
-            container.innerHTML = '';
-            
+            const feed = document.getElementById('vault-feed');
+            feed.innerHTML = '';
+
             posts.forEach(post => {
                 const postEl = document.createElement('div');
-                postEl.className = 'post-card';
-                postEl.style.marginBottom = "15px";
+                postEl.className = 'glass-card post';
                 postEl.id = `post-${post._id}`;
                 
                 let mediaHtml = post.media ? (post.type === 'video' 
-                    ? `<video src="${post.media}" controls style="width:100%; border-radius:15px; margin-top:10px;"></video>`
-                    : `<img src="${post.media}" style="width:100%; border-radius:15px; margin-top:10px;">`) : '';
+                    ? `<div class="post-media"><video src="${post.media}" controls></video></div>`
+                    : `<div class="post-media"><img src="${post.media}" loading="lazy"></div>`) : '';
+
+                const deleteBtn = post.sender === myName 
+                    ? `<i class="fas fa-trash-alt" style="opacity:0.4; font-size:14px;" onclick="deletePost('${post._id}')"></i>` 
+                    : '';
 
                 postEl.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <div class="profile-img" onclick="goToProfile('${post.sender}')">
-                                ${post.sender[0].toUpperCase()}
-                            </div>
-                            <span style="font-weight:bold;">@${post.sender}</span>
+                    <div class="post-header">
+                        <div class="user-info" onclick="window.location.href='profile.html?user=${post.sender}'">
+                            <div class="pfp-small">${post.sender[0].toUpperCase()}</div>
+                            <span style="font-weight:600; font-size:14px;">${post.sender}</span>
                         </div>
-                        ${post.sender === myName ? `<i class="fas fa-trash" style="opacity:0.3;" onclick="deletePost('${post._id}')"></i>` : ''}
+                        ${deleteBtn}
                     </div>
-                    <p style="margin:15px 0; font-size:14px;">${post.caption || ""}</p>
+                    <p style="font-size:14px; line-height:1.5; margin:0;">${post.caption || ""}</p>
                     ${mediaHtml}
+                    <div class="interaction">
+                        <i class="fas fa-heart" id="like-${post._id}" onclick="likePost('${post._id}', '${post.sender}')"></i>
+                        <i class="fas fa-comment" onclick="window.location.href='post-details.html?id=${post._id}'"></i>
+                    </div>
+                    <div style="font-size:12px; margin-top:8px; opacity:0.6;">${post.likes || 0} likes</div>
                 `;
-                container.appendChild(postEl);
+                feed.appendChild(postEl);
             });
         }
 
-        // ... (Keep your submitPost, goToProfile, and Badge logic) ...
+        async function submitPost() {
+            const caption = document.getElementById('postCaption').value;
+            if (!caption && !selectedMedia) return;
+
+            const postData = {
+                sender: myName,
+                caption: caption,
+                media: selectedMedia,
+                type: mediaType,
+                timestamp: new Date()
+            };
+
+            const res = await fetch('/api/posts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(postData)
+            });
+
+            if (res.ok) {
+                document.getElementById('postCaption').value = '';
+                selectedMedia = null;
+                document.getElementById('media-preview').innerHTML = '';
+                loadFeed();
+            }
+        }
+
+        function previewMedia() {
+            const file = document.getElementById('mediaInput').files[0];
+            if (!file) return;
+            mediaType = file.type.startsWith('video') ? 'video' : 'image';
+            
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                selectedMedia = reader.result;
+                document.getElementById('media-preview').innerHTML = mediaType === 'video' 
+                    ? `<video src="${selectedMedia}" style="width:100px; border-radius:10px;"></video>`
+                    : `<img src="${selectedMedia}" style="width:100px; border-radius:10px;">`;
+            };
+        }
+
+        async function deletePost(postId) {
+            if (!confirm("Remove this post?")) return;
+            try {
+                const res = await fetch(`/api/posts/${postId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: myName })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const el = document.getElementById(`post-${postId}`);
+                    if (el) el.remove();
+                }
+            } catch (err) { console.error("Delete error"); }
+        }
+
+        async function likePost(postId, owner) {
+            const res = await fetch(`/api/posts/${postId}/like`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: myName })
+            });
+            if (res.ok) {
+                socket.emit('send_like', { sender: myName, owner: owner });
+                loadFeed();
+            }
+        }
+
+        // --- BADGE LOGIC ---
+        async function updateBadges() {
+            try {
+                // Notifications
+                const nRes = await fetch(`/api/notifications/${myName}?unread=true`);
+                const nData = await nRes.json();
+                const nBadge = document.getElementById('notif-badge');
+                if (nBadge) {
+                    nBadge.innerText = nData.length;
+                    nBadge.style.display = nData.length > 0 ? 'block' : 'none';
+                }
+
+                // Chat Messages
+                const cRes = await fetch(`/api/unread-messages-count/${myName}`);
+                const cData = await cRes.json();
+                const cBadge = document.getElementById('chat-badge');
+                if (cBadge) {
+                    cBadge.innerText = cData.count;
+                    cBadge.style.display = cData.count > 0 ? 'block' : 'none';
+                }
+            } catch (e) { console.log("Badge error"); }
+        }
+
+        socket.on('receive_like', (data) => {
+            if (data.owner === myName) updateBadges();
+        });
+
+        socket.on('update_badge', updateBadges);
+
+        loadFeed();
+        updateBadges();
+        setInterval(updateBadges, 30000);
     </script>
+</body>
+</html>
