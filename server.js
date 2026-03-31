@@ -81,7 +81,7 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// FIX: HIGH-RELIABILITY FOLLOW PERSISTENCE
+// FIXED: RELIABLE FOLLOW PERSISTENCE
 app.post('/api/follow', async (req, res) => {
     const { me, target } = req.body;
     if (!me || !target || me === target) return res.status(400).json({ error: "Invalid usernames" });
@@ -93,19 +93,17 @@ app.post('/api/follow', async (req, res) => {
         const isFollowing = myUser.following.includes(target);
 
         if (!isFollowing) {
-            // ATOMIC UPDATE FOR BOTH USERS
+            // Wait for all DB writes to finish before responding
             await Promise.all([
                 User.updateOne({ username: me }, { $addToSet: { following: target } }),
                 User.updateOne({ username: target }, { $addToSet: { followers: me } }),
                 Notification.create({ toUser: target, fromUser: me, type: 'follow' })
             ]);
 
-            // Emit for real-time sound/badge
             io.to(target).emit('receive_notification', { fromUser: me, type: 'follow' });
-            
             res.json({ success: true, following: true });
         } else {
-            // ATOMIC REMOVAL
+            // Wait for removals to finish
             await Promise.all([
                 User.updateOne({ username: me }, { $pull: { following: target } }),
                 User.updateOne({ username: target }, { $pull: { followers: me } })
@@ -130,7 +128,6 @@ app.post('/api/posts/:id/like', async (req, res) => {
             });
 
             io.to(post.sender).emit('receive_notification', notif);
-
             res.json({ success: true });
         } else { res.json({ message: "Already liked" }); }
     } catch (err) { res.status(500).json({ error: err.message }); }
