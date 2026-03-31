@@ -13,36 +13,137 @@
     <script>
         const socket = io();
         const myName = localStorage.getItem('vault_username');
-        
-        // ... (Keep your existing feed/post functions) ...
+        let selectedMedia = null;
+        let mediaType = 'image';
 
-        // --- NEW: MESSAGE BADGE LOGIC ---
+        if (!myName) {
+            window.location.href = 'index.html';
+        }
+
+        socket.emit('join_private', myName);
+
+        // --- FEED LOGIC ---
+        async function loadFeed() {
+            try {
+                const res = await fetch('/api/posts');
+                const posts = await res.json();
+                const feed = document.getElementById('vault-feed');
+                if(!feed) return;
+                feed.innerHTML = '';
+
+                posts.forEach(post => {
+                    const postEl = document.createElement('div');
+                    postEl.className = 'glass-card post';
+                    postEl.id = `post-${post._id}`;
+                    
+                    let mediaHtml = '';
+                    if (post.media) {
+                        mediaHtml = post.type === 'video' 
+                            ? `<div class="post-media"><video src="${post.media}" controls></video></div>`
+                            : `<div class="post-media"><img src="${post.media}" loading="lazy"></div>`;
+                    }
+
+                    const deleteBtn = post.sender === myName 
+                        ? `<i class="fas fa-trash-alt" style="opacity:0.4; font-size:14px; cursor:pointer;" onclick="deletePost('${post._id}')"></i>` 
+                        : '';
+
+                    postEl.innerHTML = `
+                        <div class="post-header">
+                            <div class="user-info" onclick="window.location.href='profile.html?user=${post.sender}'">
+                                <div class="pfp-small">${post.sender[0].toUpperCase()}</div>
+                                <span style="font-weight:600; font-size:14px;">${post.sender}</span>
+                            </div>
+                            ${deleteBtn}
+                        </div>
+                        <p style="font-size:14px; line-height:1.5; margin:0;">${post.caption || ""}</p>
+                        ${mediaHtml}
+                        <div class="interaction">
+                            <i class="fas fa-heart" id="like-${post._id}" onclick="likePost('${post._id}', '${post.sender}')"></i>
+                            <i class="fas fa-comment" onclick="window.location.href='post-details.html?id=${post._id}'"></i>
+                        </div>
+                        <div style="font-size:12px; margin-top:8px; opacity:0.6;">${post.likes || 0} likes</div>
+                    `;
+                    feed.appendChild(postEl);
+                });
+            } catch (err) { console.error("Feed Error:", err); }
+        }
+
+        async function submitPost() {
+            const caption = document.getElementById('postCaption').value;
+            if (!caption && !selectedMedia) return;
+
+            const postData = {
+                sender: myName,
+                caption: caption,
+                media: selectedMedia,
+                type: mediaType,
+                timestamp: new Date()
+            };
+
+            const res = await fetch('/api/posts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(postData)
+            });
+
+            if (res.ok) {
+                document.getElementById('postCaption').value = '';
+                selectedMedia = null;
+                document.getElementById('media-preview').innerHTML = '';
+                loadFeed();
+            }
+        }
+
+        function previewMedia() {
+            const file = document.getElementById('mediaInput').files[0];
+            if (!file) return;
+            mediaType = file.type.startsWith('video') ? 'video' : 'image';
+            
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                selectedMedia = reader.result;
+                document.getElementById('media-preview').innerHTML = mediaType === 'video' 
+                    ? `<video src="${selectedMedia}" style="width:100px; border-radius:10px;"></video>`
+                    : `<img src="${selectedMedia}" style="width:100px; border-radius:10px;">`;
+            };
+        }
+
+        async function deletePost(postId) {
+            if (!confirm("Remove this post?")) return;
+            const res = await fetch(`/api/posts/${postId}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: myName })
+            });
+            if (res.ok) document.getElementById(`post-${postId}`).remove();
+        }
+
+        async function likePost(postId, owner) {
+            const res = await fetch(`/api/posts/${postId}/like`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: myName })
+            });
+            if (res.ok) {
+                socket.emit('send_like', { sender: myName, owner: owner });
+                loadFeed();
+            }
+        }
+
+        // --- BADGE LOGIC ---
         async function updateChatBadge() {
             try {
                 const res = await fetch(`/api/unread-messages-count/${myName}`);
                 const data = await res.json();
                 const badge = document.getElementById('chat-badge');
-                
                 if (data.count > 0) {
                     badge.innerText = data.count > 99 ? '99+' : data.count;
                     badge.style.display = 'block';
-                } else {
-                    badge.style.display = 'none';
-                }
+                } else { badge.style.display = 'none'; }
             } catch (e) { console.log("Chat badge update failed"); }
         }
 
-        // Listen for the 'update_badge' event we added to server.js
-        socket.on('update_badge', () => {
-            document.getElementById('notifSound').play();
-            updateChatBadge();
-        });
-
-        // Initial check and periodic refresh
-        updateChatBadge();
-        setInterval(updateChatBadge, 10000); 
-
-        // --- EXISTING NOTIFICATION LOGIC ---
         async function updateNotifBadge() {
             try {
                 const res = await fetch(`/api/notifications/${myName}?unread=true`);
@@ -51,21 +152,26 @@
                 if (data.length > 0) {
                     badge.innerText = data.length;
                     badge.style.display = 'block';
-                } else {
-                    badge.style.display = 'none';
-                }
+                } else { badge.style.display = 'none'; }
             } catch (e) { console.log("Notif update failed"); }
         }
 
+        socket.on('update_badge', () => {
+            if(document.getElementById('notifSound')) document.getElementById('notifSound').play();
+            updateChatBadge();
+        });
+
         socket.on('receive_like', (data) => {
             if (data.owner === myName) {
-                document.getElementById('notifSound').play();
+                if(document.getElementById('notifSound')) document.getElementById('notifSound').play();
                 updateNotifBadge();
             }
         });
 
-        setInterval(updateNotifBadge, 15000);
+        // Initialize
+        loadFeed();
+        updateChatBadge();
         updateNotifBadge();
-        
-        // ... (Keep the rest of your loadFeed/submitPost functions) ...
+        setInterval(updateChatBadge, 10000);
+        setInterval(updateNotifBadge, 15000);
     </script>
