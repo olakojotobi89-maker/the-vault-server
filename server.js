@@ -47,6 +47,17 @@ const User = mongoose.model('User', new mongoose.Schema({
     }
 }));
 
+const Post = mongoose.model('Post', new mongoose.Schema({
+    sender: { type: String, required: true, index: true },
+    caption: String,
+    media: String, 
+    type: { type: String, default: 'image' }, 
+    likedBy: [{ type: String }],
+    likes: { type: Number, default: 0 },
+    comments: [{ user: String, text: String, date: { type: Date, default: Date.now } }],
+    timestamp: { type: Date, default: Date.now }
+}));
+
 const Message = mongoose.model('Message', new mongoose.Schema({
     sender: { type: String, required: true, index: true },
     receiver: { type: String, required: true, index: true },
@@ -64,9 +75,50 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
     read: { type: Boolean, default: false }
 }));
 
-// --- NEW CHAT LOGIC ROUTES ---
+// --- API ROUTES ---
 
-// 1. Get TOTAL unread count for Home Page Badge
+// 1. Posts & Feed Logic
+app.get('/api/posts', async (req, res) => {
+    try {
+        const posts = await Post.find().sort({ timestamp: -1 }).limit(50);
+        res.json(posts);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/posts', async (req, res) => {
+    try {
+        const post = await Post.create(req.body);
+        res.json(post);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/posts/:id', async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
+        if (post && post.sender === req.body.username) {
+            await Post.findByIdAndDelete(req.params.id);
+            res.json({ success: true });
+        } else {
+            res.status(403).json({ error: "Unauthorized" });
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/posts/:id/like', async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
+        if (!post.likedBy.includes(req.body.username)) {
+            post.likedBy.push(req.body.username);
+            post.likes += 1;
+            await post.save();
+            res.json({ success: true });
+        } else {
+            res.json({ message: "Already liked" });
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. Chat Logic
 app.get('/api/unread-messages-count/:username', async (req, res) => {
     try {
         const count = await Message.countDocuments({ receiver: req.params.username, seen: false });
@@ -74,7 +126,6 @@ app.get('/api/unread-messages-count/:username', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 2. Get Chat List with individual unread counts
 app.get('/api/chat-list/:username', async (req, res) => {
     try {
         const username = req.params.username;
@@ -96,12 +147,10 @@ app.get('/api/chat-list/:username', async (req, res) => {
             });
             return { ...u._doc, unreadCount };
         }));
-
         res.json(chatList);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 3. Get Messages + Mark as Seen automatically
 app.get('/api/messages/:me/:target', async (req, res) => {
     try {
         await Message.updateMany(
@@ -118,24 +167,7 @@ app.get('/api/messages/:me/:target', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- EXISTING ROUTES ---
-app.get('/api/notifications/:username', async (req, res) => {
-    try {
-        const unreadOnly = req.query.unread === 'true';
-        let filter = { toUser: req.params.username };
-        if (unreadOnly) filter.read = false;
-        const notifications = await Notification.find(filter).sort({ timestamp: -1 });
-        res.json(notifications);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/notifications/read/:username', async (req, res) => {
-    try {
-        await Notification.updateMany({ toUser: req.params.username, read: false }, { $set: { read: true } });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
+// 3. Auth & Notifications
 app.post('/api/login', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.body.username });
@@ -145,19 +177,26 @@ app.post('/api/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/notifications/:username', async (req, res) => {
+    try {
+        const notifications = await Notification.find({ toUser: req.params.username }).sort({ timestamp: -1 });
+        res.json(notifications);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
     socket.on('join_private', (username) => socket.join(username));
     socket.on('send_message', async (data) => {
         try {
-            const receiverDoc = await User.findOne({ username: data.receiver });
-            if (receiverDoc && receiverDoc.blockedUsers.includes(data.sender)) return;
             const newMessage = await Message.create(data);
             io.to(data.receiver).emit('receive_message', newMessage);
             io.to(data.sender).emit('receive_message', newMessage);
-            // Notify home badge
             io.to(data.receiver).emit('update_badge'); 
         } catch (err) { console.error(err); }
+    });
+    socket.on('send_like', (data) => {
+        io.to(data.owner).emit('receive_like', { sender: data.sender, owner: data.owner });
     });
 });
 
