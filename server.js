@@ -20,7 +20,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// --- RENDER ROUTING (Fixes "Cannot GET" errors) ---
+// --- RENDER ROUTING ---
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/home.html', (req, res) => res.sendFile(path.join(__dirname, 'home.html')));
 app.get('/notification.html', (req, res) => res.sendFile(path.join(__dirname, 'notification.html')));
@@ -71,17 +71,16 @@ const Message = mongoose.model('Message', new mongoose.Schema({
     seen: { type: Boolean, default: false }
 }));
 
-// New Notification Schema to keep history forever
 const Notification = mongoose.model('Notification', new mongoose.Schema({
     toUser: { type: String, required: true, index: true },
     fromUser: { type: String, required: true },
-    type: { type: String, required: true }, // 'like', 'comment', 'follow'
+    type: { type: String, required: true }, 
     timestamp: { type: Date, default: Date.now }
 }));
 
 // --- API ROUTES ---
 
-// INSTAGRAM STYLE SEARCH: Finds users by name and returns profile pics
+// INSTAGRAM STYLE SEARCH
 app.get('/api/users/search', async (req, res) => {
     const query = req.query.q;
     if (!query) return res.json([]);
@@ -93,11 +92,19 @@ app.get('/api/users/search', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Search failed" }); }
 });
 
-// GET NOTIFICATIONS: Pulls all activity for a specific user
+// NOTIFICATION SYSTEM
 app.get('/api/notifications/:username', async (req, res) => {
     try {
         const notifications = await Notification.find({ toUser: req.params.username }).sort({ timestamp: -1 });
         res.json(notifications);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Clear All Notifications Route
+app.delete('/api/notifications/:username', async (req, res) => {
+    try {
+        await Notification.deleteMany({ toUser: req.params.username });
+        res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -123,8 +130,13 @@ app.post('/api/follow', async (req, res) => {
         } else {
             await User.findOneAndUpdate({ username: target }, { $push: { followers: follower } });
             await User.findOneAndUpdate({ username: follower }, { $push: { following: target } });
-            // Save notification for follow
+            
+            // Create Persistent Follow Notification
             await Notification.create({ toUser: target, fromUser: follower, type: 'follow' });
+            
+            // Emit Socket for Real-time Sound/Badge
+            io.to(target).emit('receive_notification', { type: 'follow', from: follower });
+            
             res.json({ success: true, action: "followed", isFollowing: true });
         }
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -144,7 +156,6 @@ app.post('/api/posts', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Post failed" }); }
 });
 
-// LIKE ROUTE: Updated to save notification
 app.post('/api/posts/:id/like', async (req, res) => {
     try {
         const post = await Post.findById(req.params.id);
@@ -153,9 +164,12 @@ app.post('/api/posts/:id/like', async (req, res) => {
             post.likedBy.push(username);
             post.likes += 1;
             await post.save();
-            // Only notify if liking someone else's post
+            
             if (post.sender !== username) {
+                // Save to Database
                 await Notification.create({ toUser: post.sender, fromUser: username, type: 'like' });
+                // Notify via Socket
+                io.to(post.sender).emit('receive_like', { sender: username, owner: post.sender });
             }
         }
         res.json({ success: true, likes: post.likes });
@@ -201,6 +215,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('send_like', (data) => {
+        // Handled in the API route now for better reliability, 
+        // but kept for compatibility
         io.to(data.owner).emit('receive_like', { sender: data.sender, owner: data.owner });
     });
 });
