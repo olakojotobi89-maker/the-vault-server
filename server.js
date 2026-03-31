@@ -81,7 +81,6 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// FIXED: RELIABLE FOLLOW PERSISTENCE
 app.post('/api/follow', async (req, res) => {
     const { me, target } = req.body;
     if (!me || !target || me === target) return res.status(400).json({ error: "Invalid usernames" });
@@ -93,7 +92,6 @@ app.post('/api/follow', async (req, res) => {
         const isFollowing = myUser.following.includes(target);
 
         if (!isFollowing) {
-            // Wait for all DB writes to finish before responding
             await Promise.all([
                 User.updateOne({ username: me }, { $addToSet: { following: target } }),
                 User.updateOne({ username: target }, { $addToSet: { followers: me } }),
@@ -103,7 +101,6 @@ app.post('/api/follow', async (req, res) => {
             io.to(target).emit('receive_notification', { fromUser: me, type: 'follow' });
             res.json({ success: true, following: true });
         } else {
-            // Wait for removals to finish
             await Promise.all([
                 User.updateOne({ username: me }, { $pull: { following: target } }),
                 User.updateOne({ username: target }, { $pull: { followers: me } })
@@ -201,6 +198,7 @@ app.get('/api/unread-messages-count/:username', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// FIXED: Ensuring partner profile pictures are returned in chat list
 app.get('/api/chat-list/:username', async (req, res) => {
     try {
         const username = req.params.username;
@@ -219,7 +217,11 @@ app.get('/api/chat-list/:username', async (req, res) => {
             const unreadCount = await Message.countDocuments({
                 sender: u.username, receiver: username, seen: false
             });
-            return { ...u._doc, unreadCount };
+            return { 
+                username: u.username, 
+                profilePic: u.profilePic, 
+                unreadCount 
+            };
         }));
         res.json(chatList);
     } catch (err) { res.status(500).json({ error: err.message }); }
