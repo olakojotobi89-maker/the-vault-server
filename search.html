@@ -7,66 +7,88 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root { --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); }
-        body { margin: 0; padding: 0; min-height: 100dvh; background: var(--primary-gradient); font-family: -apple-system, sans-serif; color: white; display: flex; justify-content: center; }
-        .container { width: 95%; max-width: 500px; padding: 20px 0 100px; }
         
-        /* High-end Search Input */
-        .search-box { 
-            position: sticky; top: 10px; z-index: 100;
-            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px);
-            border-radius: 20px; padding: 5px 15px; border: 1px solid rgba(255, 255, 255, 0.2);
-            display: flex; align-items: center; gap: 10px; margin-bottom: 30px;
+        body { 
+            margin: 0; padding: 0; min-height: 100dvh; 
+            background: var(--primary-gradient); 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            color: white; overflow-x: hidden;
         }
-        .search-box input {
-            flex-grow: 1; background: none; border: none; padding: 12px 0;
-            color: white; font-size: 16px; outline: none;
-        }
-        .search-box i { opacity: 0.6; }
 
-        /* User Card */
-        .user-card {
-            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(15px);
-            border-radius: 20px; padding: 15px; margin-bottom: 12px;
-            display: flex; align-items: center; justify-content: space-between;
+        .container { width: 95%; max-width: 500px; margin: auto; padding: 20px 0 100px; }
+
+        /* Search Header */
+        .search-header {
+            position: sticky; top: 0; z-index: 1000;
+            background: rgba(26, 42, 108, 0.8); backdrop-filter: blur(20px);
+            padding: 15px 0; margin-bottom: 20px;
+        }
+
+        .search-input-wrapper {
+            background: rgba(255, 255, 255, 0.15); border-radius: 12px;
+            padding: 10px 15px; display: flex; align-items: center; gap: 10px;
             border: 1px solid rgba(255, 255, 255, 0.1);
-            animation: fadeIn 0.3s ease;
-        }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
-        
-        .user-info { display: flex; align-items: center; gap: 15px; }
-        .avatar { 
-            width: 50px; height: 50px; border-radius: 50%; background: #222; 
-            display: flex; align-items: center; justify-content: center; 
-            border: 2px solid #fdbb2d; font-weight: bold; font-size: 20px;
-        }
-        .view-btn { 
-            background: #fdbb2d; color: black; border: none; padding: 8px 15px; 
-            border-radius: 12px; font-size: 12px; font-weight: bold; cursor: pointer;
         }
 
+        .search-input-wrapper input {
+            flex: 1; background: none; border: none; color: white;
+            font-size: 16px; outline: none;
+        }
+
+        /* Instagram Style User List */
+        .user-list { display: flex; flex-direction: column; gap: 5px; }
+
+        .user-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px; border-radius: 15px; transition: 0.2s;
+            cursor: pointer;
+        }
+
+        .user-item:active { background: rgba(255, 255, 255, 0.1); scale: 0.98; }
+
+        .user-main { display: flex; align-items: center; gap: 12px; }
+
+        .pfp-vault {
+            width: 55px; height: 55px; border-radius: 50%;
+            background: #222; border: 2px solid #fdbb2d;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden; flex-shrink: 0;
+        }
+
+        .pfp-vault img { width: 100%; height: 100%; object-fit: cover; }
+        .pfp-vault span { font-size: 20px; font-weight: bold; color: #fdbb2d; }
+
+        .username-container { display: flex; flex-direction: column; }
+        .username { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 5px; }
+        .full-name { font-size: 13px; opacity: 0.6; }
+
+        .verified-icon { color: #3897f0; font-size: 12px; }
+
+        /* Navigation Bar */
         .nav-bottom {
-            position: fixed; bottom: 20px; width: 90%; max-width: 400px;
-            background: rgba(0,0,0,0.6); backdrop-filter: blur(20px);
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 400px;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(25px);
             border-radius: 30px; padding: 15px 30px; display: flex;
             justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1);
         }
-        .nav-item { color: white; opacity: 0.6; font-size: 20px; text-decoration: none; }
+        .nav-item { color: white; opacity: 0.5; font-size: 20px; text-decoration: none; }
         .nav-item.active { opacity: 1; color: #fdbb2d; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2 style="margin-bottom: 20px; letter-spacing: 1px;">Discover</h2>
-        
-        <div class="search-box">
-            <i class="fas fa-search"></i>
-            <input type="text" id="searchInput" placeholder="Search usernames..." onkeyup="handleSearch()">
+        <div class="search-header">
+            <h2 style="margin: 0 0 15px 5px; letter-spacing: 0.5px;">Explore</h2>
+            <div class="search-input-wrapper">
+                <i class="fas fa-search" style="opacity: 0.5;"></i>
+                <input type="text" id="mainSearch" placeholder="Search the Vault..." oninput="searchVault()">
+            </div>
         </div>
 
-        <div id="results-list">
-            <p style="text-align:center; opacity:0.5; margin-top:50px;">Type a name to search the Vault</p>
-        </div>
+        <div id="results-area" class="user-list">
+            </div>
     </div>
 
     <nav class="nav-bottom">
@@ -77,12 +99,12 @@
     </nav>
 
     <script>
-        async function handleSearch() {
-            const query = document.getElementById('searchInput').value;
-            const list = document.getElementById('results-list');
+        async function searchVault() {
+            const query = document.getElementById('mainSearch').value;
+            const resultsArea = document.getElementById('results-area');
 
             if (query.length < 1) {
-                list.innerHTML = '<p style="text-align:center; opacity:0.5; margin-top:50px;">Type a name to search the Vault</p>';
+                resultsArea.innerHTML = '<p style="text-align:center; margin-top:40px; opacity:0.4;">Search for agents in the Vault</p>';
                 return;
             }
 
@@ -91,26 +113,35 @@
                 const users = await res.json();
 
                 if (users.length === 0) {
-                    list.innerHTML = '<p style="text-align:center; opacity:0.5;">No agents found with that name.</p>';
+                    resultsArea.innerHTML = '<p style="text-align:center; margin-top:40px; opacity:0.4;">No results found.</p>';
                     return;
                 }
 
-                list.innerHTML = users.map(user => `
-                    <div class="user-card" onclick="window.location.href='profile.html?user=${user.username}'">
-                        <div class="user-info">
-                            <div class="avatar">${user.username[0].toUpperCase()}</div>
-                            <div>
-                                <div style="font-weight:700;">${user.username}</div>
-                                <div style="font-size:12px; opacity:0.6;">Vault Member</div>
+                resultsArea.innerHTML = users.map(user => {
+                    const profileDisplay = user.profilePic 
+                        ? `<img src="${user.profilePic}" alt="${user.username}">` 
+                        : `<span>${user.username[0].toUpperCase()}</span>`;
+
+                    return `
+                        <div class="user-item" onclick="window.location.href='profile.html?user=${user.username}'">
+                            <div class="user-main">
+                                <div class="pfp-vault">${profileDisplay}</div>
+                                <div class="username-container">
+                                    <span class="username">${user.username} <i class="fas fa-check-circle verified-icon"></i></span>
+                                    <span class="full-name">Vault Member</span>
+                                </div>
                             </div>
+                            <i class="fas fa-chevron-right" style="opacity:0.3; font-size:12px;"></i>
                         </div>
-                        <button class="view-btn">VIEW</button>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
             } catch (err) {
-                console.error(err);
+                console.error("Search Error:", err);
             }
         }
+
+        // Initialize empty state
+        searchVault();
     </script>
 </body>
 </html>
