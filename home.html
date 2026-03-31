@@ -1,19 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vault | Home</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <script src="/socket.io/socket.io.js"></script>
-    
-    <style>
-        /* Keep your existing styles here exactly as they are */
-    </style>
-</head>
-<body>
-
-    <nav class="nav-bottom">
+<nav class="nav-bottom">
         <a href="home.html" class="nav-item active"><i class="fas fa-home"></i></a>
         <a href="search.html" class="nav-item"><i class="fas fa-search"></i></a>
         
@@ -25,8 +10,9 @@
         <a href="profile.html" class="nav-item"><i class="fas fa-user"></i></a>
     </nav>
 
+    <script src="/socket.io/socket.io.js"></script>
+
     <script>
-        // Initialize Socket first
         const socket = io();
         const myName = localStorage.getItem('vault_username');
         let selectedMedia = null;
@@ -38,7 +24,7 @@
 
         socket.emit('join_private', myName);
 
-        // --- FEED LOGIC ---
+        // --- FEED LOGIC (RESTORED) ---
         async function loadFeed() {
             try {
                 const res = await fetch('/api/posts');
@@ -105,7 +91,7 @@
             if (res.ok) {
                 document.getElementById('postCaption').value = '';
                 selectedMedia = null;
-                document.getElementById('media-preview').innerHTML = '';
+                if(document.getElementById('media-preview')) document.getElementById('media-preview').innerHTML = '';
                 loadFeed();
             }
         }
@@ -119,9 +105,9 @@
             reader.readAsDataURL(file);
             reader.onload = () => {
                 selectedMedia = reader.result;
-                const previewDiv = document.getElementById('media-preview');
-                if(previewDiv) {
-                    previewDiv.innerHTML = mediaType === 'video' 
+                const preview = document.getElementById('media-preview');
+                if(preview) {
+                    preview.innerHTML = mediaType === 'video' 
                         ? `<video src="${selectedMedia}" style="width:100px; border-radius:10px;"></video>`
                         : `<img src="${selectedMedia}" style="width:100px; border-radius:10px;">`;
                 }
@@ -150,7 +136,7 @@
             }
         }
 
-        // --- BADGE LOGIC ---
+        // --- BADGE LOGIC (RESTORED) ---
         async function updateChatBadge() {
             try {
                 const res = await fetch(`/api/unread-messages-count/${myName}`);
@@ -200,5 +186,3 @@
         setInterval(updateChatBadge, 10000);
         setInterval(updateNotifBadge, 15000);
     </script>
-</body>
-</html>
