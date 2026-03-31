@@ -1,4 +1,19 @@
-<nav class="nav-bottom">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vault | Home</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <style>
+        /* Keep your existing styles here exactly as they are */
+    </style>
+</head>
+<body>
+
+    <nav class="nav-bottom">
         <a href="home.html" class="nav-item active"><i class="fas fa-home"></i></a>
         <a href="search.html" class="nav-item"><i class="fas fa-search"></i></a>
         
@@ -11,6 +26,7 @@
     </nav>
 
     <script>
+        // Initialize Socket first
         const socket = io();
         const myName = localStorage.getItem('vault_username');
         let selectedMedia = null;
@@ -103,9 +119,12 @@
             reader.readAsDataURL(file);
             reader.onload = () => {
                 selectedMedia = reader.result;
-                document.getElementById('media-preview').innerHTML = mediaType === 'video' 
-                    ? `<video src="${selectedMedia}" style="width:100px; border-radius:10px;"></video>`
-                    : `<img src="${selectedMedia}" style="width:100px; border-radius:10px;">`;
+                const previewDiv = document.getElementById('media-preview');
+                if(previewDiv) {
+                    previewDiv.innerHTML = mediaType === 'video' 
+                        ? `<video src="${selectedMedia}" style="width:100px; border-radius:10px;"></video>`
+                        : `<img src="${selectedMedia}" style="width:100px; border-radius:10px;">`;
+                }
             };
         }
 
@@ -137,10 +156,12 @@
                 const res = await fetch(`/api/unread-messages-count/${myName}`);
                 const data = await res.json();
                 const badge = document.getElementById('chat-badge');
-                if (data.count > 0) {
-                    badge.innerText = data.count > 99 ? '99+' : data.count;
-                    badge.style.display = 'block';
-                } else { badge.style.display = 'none'; }
+                if (badge) {
+                    if (data.count > 0) {
+                        badge.innerText = data.count > 99 ? '99+' : data.count;
+                        badge.style.display = 'block';
+                    } else { badge.style.display = 'none'; }
+                }
             } catch (e) { console.log("Chat badge update failed"); }
         }
 
@@ -149,21 +170,25 @@
                 const res = await fetch(`/api/notifications/${myName}?unread=true`);
                 const data = await res.json();
                 const badge = document.getElementById('notif-badge');
-                if (data.length > 0) {
-                    badge.innerText = data.length;
-                    badge.style.display = 'block';
-                } else { badge.style.display = 'none'; }
+                if (badge) {
+                    if (data.length > 0) {
+                        badge.innerText = data.length;
+                        badge.style.display = 'block';
+                    } else { badge.style.display = 'none'; }
+                }
             } catch (e) { console.log("Notif update failed"); }
         }
 
         socket.on('update_badge', () => {
-            if(document.getElementById('notifSound')) document.getElementById('notifSound').play();
+            const sound = document.getElementById('notifSound');
+            if(sound) sound.play();
             updateChatBadge();
         });
 
         socket.on('receive_like', (data) => {
             if (data.owner === myName) {
-                if(document.getElementById('notifSound')) document.getElementById('notifSound').play();
+                const sound = document.getElementById('notifSound');
+                if(sound) sound.play();
                 updateNotifBadge();
             }
         });
@@ -175,3 +200,5 @@
         setInterval(updateChatBadge, 10000);
         setInterval(updateNotifBadge, 15000);
     </script>
+</body>
+</html>
