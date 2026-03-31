@@ -1,30 +1,117 @@
-<nav class="nav-bottom">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vault | Home</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="/socket.io/socket.io.js"></script>
+
+    <style>
+        /* --- YOUR RESTORED CSS --- */
+        :root {
+            --glass: rgba(255, 255, 255, 0.2);
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--primary-gradient);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* Home/Feed Specific Glass Cards */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 25px;
+            padding: 15px;
+            margin-bottom: 15px;
+            color: white;
+        }
+
+        .nav-bottom {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-around;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+        }
+
+        .nav-item { color: rgba(255,255,255,0.6); font-size: 20px; text-decoration: none; }
+        .nav-item.active { color: #fdbb2d; } /* Your Gold Accent */
+
+        #vault-feed {
+            width: 100%;
+            height: 80vh;
+            overflow-y: auto;
+            padding: 20px;
+            padding-bottom: 100px;
+            box-sizing: border-box;
+        }
+
+        .post-media img, .post-media video {
+            width: 100%;
+            border-radius: 15px;
+            margin-top: 10px;
+        }
+
+        /* Badge Styling */
+        #chat-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #fdbb2d;
+            color: black;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: bold;
+            border: 2px solid #000;
+        }
+
+        /* Custom scrollbar for professional look */
+        #vault-feed::-webkit-scrollbar { width: 5px; }
+        #vault-feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="vault-feed">
+        </div>
+
+    <nav class="nav-bottom">
         <a href="home.html" class="nav-item active"><i class="fas fa-home"></i></a>
         <a href="search.html" class="nav-item"><i class="fas fa-search"></i></a>
         
         <a href="chat.html" class="nav-item" style="position: relative;">
             <i class="fas fa-comment-alt"></i>
-            <span id="chat-badge" style="display:none; position:absolute; top:-8px; right:-8px; background:#fdbb2d; color:black; border-radius:50%; padding:2px 6px; font-size:10px; font-weight:bold; border:2px solid #000;">0</span>
+            <span id="chat-badge" style="display:none;">0</span>
         </a>
         
         <a href="profile.html" class="nav-item"><i class="fas fa-user"></i></a>
     </nav>
 
-    <script src="/socket.io/socket.io.js"></script>
-
     <script>
         const socket = io();
         const myName = localStorage.getItem('vault_username');
-        let selectedMedia = null;
-        let mediaType = 'image';
 
-        if (!myName) {
-            window.location.href = 'index.html';
-        }
-
+        if (!myName) { window.location.href = 'index.html'; }
         socket.emit('join_private', myName);
 
-        // --- FEED LOGIC (RESTORED) ---
+        // --- FEED LOGIC ---
         async function loadFeed() {
             try {
                 const res = await fetch('/api/posts');
@@ -35,154 +122,58 @@
 
                 posts.forEach(post => {
                     const postEl = document.createElement('div');
-                    postEl.className = 'glass-card post';
+                    postEl.className = 'glass-card';
                     postEl.id = `post-${post._id}`;
                     
-                    let mediaHtml = '';
-                    if (post.media) {
-                        mediaHtml = post.type === 'video' 
-                            ? `<div class="post-media"><video src="${post.media}" controls></video></div>`
-                            : `<div class="post-media"><img src="${post.media}" loading="lazy"></div>`;
-                    }
-
-                    const deleteBtn = post.sender === myName 
-                        ? `<i class="fas fa-trash-alt" style="opacity:0.4; font-size:14px; cursor:pointer;" onclick="deletePost('${post._id}')"></i>` 
-                        : '';
+                    let mediaHtml = post.media ? (post.type === 'video' 
+                        ? `<div class="post-media"><video src="${post.media}" controls></video></div>`
+                        : `<div class="post-media"><img src="${post.media}"></div>`) : '';
 
                     postEl.innerHTML = `
-                        <div class="post-header">
-                            <div class="user-info" onclick="window.location.href='profile.html?user=${post.sender}'">
-                                <div class="pfp-small">${post.sender[0].toUpperCase()}</div>
-                                <span style="font-weight:600; font-size:14px;">${post.sender}</span>
-                            </div>
-                            ${deleteBtn}
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                            <span style="font-weight:bold; color:#fdbb2d;">@${post.sender}</span>
+                            ${post.sender === myName ? `<i class="fas fa-trash" style="font-size:12px; opacity:0.5;" onclick="deletePost('${post._id}')"></i>` : ''}
                         </div>
-                        <p style="font-size:14px; line-height:1.5; margin:0;">${post.caption || ""}</p>
+                        <p style="margin:0; font-size:14px;">${post.caption || ""}</p>
                         ${mediaHtml}
-                        <div class="interaction">
-                            <i class="fas fa-heart" id="like-${post._id}" onclick="likePost('${post._id}', '${post.sender}')"></i>
-                            <i class="fas fa-comment" onclick="window.location.href='post-details.html?id=${post._id}'"></i>
-                        </div>
-                        <div style="font-size:12px; margin-top:8px; opacity:0.6;">${post.likes || 0} likes</div>
                     `;
                     feed.appendChild(postEl);
                 });
-            } catch (err) { console.error("Feed Error:", err); }
+            } catch (err) { console.error(err); }
         }
 
-        async function submitPost() {
-            const caption = document.getElementById('postCaption').value;
-            if (!caption && !selectedMedia) return;
-
-            const postData = {
-                sender: myName,
-                caption: caption,
-                media: selectedMedia,
-                type: mediaType,
-                timestamp: new Date()
-            };
-
-            const res = await fetch('/api/posts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(postData)
-            });
-
-            if (res.ok) {
-                document.getElementById('postCaption').value = '';
-                selectedMedia = null;
-                if(document.getElementById('media-preview')) document.getElementById('media-preview').innerHTML = '';
-                loadFeed();
-            }
-        }
-
-        function previewMedia() {
-            const file = document.getElementById('mediaInput').files[0];
-            if (!file) return;
-            mediaType = file.type.startsWith('video') ? 'video' : 'image';
-            
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => {
-                selectedMedia = reader.result;
-                const preview = document.getElementById('media-preview');
-                if(preview) {
-                    preview.innerHTML = mediaType === 'video' 
-                        ? `<video src="${selectedMedia}" style="width:100px; border-radius:10px;"></video>`
-                        : `<img src="${selectedMedia}" style="width:100px; border-radius:10px;">`;
-                }
-            };
-        }
-
-        async function deletePost(postId) {
-            if (!confirm("Remove this post?")) return;
-            const res = await fetch(`/api/posts/${postId}`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: myName })
-            });
-            if (res.ok) document.getElementById(`post-${postId}`).remove();
-        }
-
-        async function likePost(postId, owner) {
-            const res = await fetch(`/api/posts/${postId}/like`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: myName })
-            });
-            if (res.ok) {
-                socket.emit('send_like', { sender: myName, owner: owner });
-                loadFeed();
-            }
-        }
-
-        // --- BADGE LOGIC (RESTORED) ---
+        // --- BADGE LOGIC ---
         async function updateChatBadge() {
             try {
                 const res = await fetch(`/api/unread-messages-count/${myName}`);
                 const data = await res.json();
                 const badge = document.getElementById('chat-badge');
-                if (badge) {
-                    if (data.count > 0) {
-                        badge.innerText = data.count > 99 ? '99+' : data.count;
-                        badge.style.display = 'block';
-                    } else { badge.style.display = 'none'; }
-                }
-            } catch (e) { console.log("Chat badge update failed"); }
-        }
-
-        async function updateNotifBadge() {
-            try {
-                const res = await fetch(`/api/notifications/${myName}?unread=true`);
-                const data = await res.json();
-                const badge = document.getElementById('notif-badge');
-                if (badge) {
-                    if (data.length > 0) {
-                        badge.innerText = data.length;
-                        badge.style.display = 'block';
-                    } else { badge.style.display = 'none'; }
-                }
-            } catch (e) { console.log("Notif update failed"); }
+                if (data.count > 0) {
+                    badge.innerText = data.count > 99 ? '99+' : data.count;
+                    badge.style.display = 'block';
+                } else { badge.style.display = 'none'; }
+            } catch (e) { console.log("Badge error"); }
         }
 
         socket.on('update_badge', () => {
-            const sound = document.getElementById('notifSound');
-            if(sound) sound.play();
             updateChatBadge();
+            // Notification sound logic can go here
         });
 
-        socket.on('receive_like', (data) => {
-            if (data.owner === myName) {
-                const sound = document.getElementById('notifSound');
-                if(sound) sound.play();
-                updateNotifBadge();
-            }
-        });
+        async function deletePost(id) {
+            if(!confirm("Delete post?")) return;
+            const res = await fetch(`/api/posts/${id}`, {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username: myName })
+            });
+            if(res.ok) document.getElementById(`post-${id}`).remove();
+        }
 
-        // Initialize
+        // Run on load
         loadFeed();
         updateChatBadge();
-        updateNotifBadge();
         setInterval(updateChatBadge, 10000);
-        setInterval(updateNotifBadge, 15000);
     </script>
+</body>
+</html>
