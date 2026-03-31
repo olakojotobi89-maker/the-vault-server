@@ -45,7 +45,7 @@
         .search-bar { position: relative; }
         .search-bar input {
             width: 100%; background: rgba(255,255,255,0.1); border: none; padding: 12px 40px;
-            border-radius: 15px; color: white; font-size: 14px;
+            border-radius: 15px; color: white; font-size: 14px; cursor: pointer;
         }
         .search-bar i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); opacity: 0.5; }
 
@@ -74,22 +74,32 @@
         }
         .nav-item { color: white; opacity: 0.6; font-size: 20px; text-decoration: none; transition: 0.3s; }
         .nav-item.active { opacity: 1; color: #fdbb2d; }
+
+        /* Notif Badge */
+        #notif-badge {
+            position: absolute; top: -5px; right: -5px; 
+            background: #ff4d4d; color: white; font-size: 10px; 
+            padding: 2px 6px; border-radius: 50%; display: none;
+            font-weight: bold; border: 2px solid #1a2a6c;
+        }
     </style>
 </head>
 <body>
 
+    <audio id="notifSound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3"></audio>
+
     <div class="container">
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 10px;">
             <h2 style="margin:0; letter-spacing: 1px;">VAULT</h2>
-            <a href="notification.html" style="color: inherit; text-decoration: none;">
-                <i class="fas fa-bell" style="font-size: 20px; opacity: 0.8;"></i>
-            </a>
+            <div style="position: relative; cursor: pointer;" onclick="window.location.href='notification.html'">
+                <i class="fas fa-bell" style="font-size: 22px; opacity: 0.8;"></i>
+                <span id="notif-badge">0</span>
+            </div>
         </div>
 
-        <div class="search-bar">
+        <div class="search-bar" onclick="window.location.href='search.html'">
             <i class="fas fa-search"></i>
-            <input type="text" id="userSearch" placeholder="Search the Vault..." onkeyup="searchUsers()">
-            <div id="search-results" style="position: absolute; width: 100%; z-index: 10;"></div>
+            <input type="text" placeholder="Search the Vault..." readonly>
         </div>
 
         <div class="glass-card post-box">
@@ -122,6 +132,33 @@
         let mediaType = 'image';
 
         socket.emit('join_private', myName);
+
+        // --- NOTIFICATION UPDATE LOGIC ---
+        async function updateNotifBadge() {
+            try {
+                const res = await fetch(`/api/notifications/${myName}`);
+                const data = await res.json();
+                const badge = document.getElementById('notif-badge');
+                if (data.length > 0) {
+                    badge.innerText = data.length;
+                    badge.style.display = 'block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            } catch (e) { console.log("Notif update failed"); }
+        }
+
+        // Listen for live likes via socket
+        socket.on('receive_like', (data) => {
+            if (data.owner === myName) {
+                document.getElementById('notifSound').play();
+                updateNotifBadge();
+            }
+        });
+
+        // Check for notifications every 15 seconds
+        setInterval(updateNotifBadge, 15000);
+        updateNotifBadge();
 
         async function loadFeed() {
             try {
@@ -209,40 +246,18 @@
         }
 
         async function deletePost(postId) {
-            if (!postId || postId === 'undefined') {
-                alert("Error: Post ID is missing.");
-                return;
-            }
-
             if (!confirm("Remove this post from the Vault?")) return;
-
             try {
                 const res = await fetch(`/api/posts/${postId}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: myName })
                 });
-
-                const contentType = res.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    const data = await res.json();
-                    if (res.ok && data.success) {
-                        const el = document.getElementById(`post-${postId}`);
-                        if (el) el.remove();
-                    } else {
-                        alert("Delete failed: " + (data.error || "Unknown error"));
-                    }
-                } else {
-                    if (res.ok) {
-                        location.reload(); 
-                    } else {
-                        alert("Server error: " + res.status);
-                    }
+                if (res.ok) {
+                    const el = document.getElementById(`post-${postId}`);
+                    if (el) el.remove();
                 }
-            } catch (err) { 
-                console.error("Delete Error:", err);
-                alert("Connection error. Check your internet."); 
-            }
+            } catch (err) { console.error("Delete Error:", err); }
         }
 
         async function likePost(postId, owner) {
