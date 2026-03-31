@@ -61,11 +61,10 @@
     <div class="container">
         <div class="header">
             <h2 style="margin:0;">Activity</h2>
-            <span style="font-size: 12px; opacity: 0.6;" onclick="clearNotifications()">Clear All</span>
+            <span style="font-size: 12px; opacity: 0.6; cursor: pointer;" onclick="clearNotifications()">Clear All</span>
         </div>
 
-        <div id="notification-list">
-            </div>
+        <div id="notification-list"></div>
     </div>
 
     <nav class="nav-bottom">
@@ -107,6 +106,23 @@
                         </div>
                     `;
                 }).join('');
+                
+                // Triggers the badge reset
+                markAsRead();
+            } catch (err) { console.error(err); }
+        }
+
+        async function markAsRead() {
+            try {
+                await fetch(`/api/notifications/read/${myName}`, { method: 'POST' });
+            } catch (err) { console.error("Could not clear badge:", err); }
+        }
+
+        async function clearNotifications() {
+            if(!confirm("Clear all activity history?")) return;
+            try {
+                const res = await fetch(`/api/notifications/${myName}`, { method: 'DELETE' });
+                if (res.ok) loadNotifications();
             } catch (err) { console.error(err); }
         }
 
