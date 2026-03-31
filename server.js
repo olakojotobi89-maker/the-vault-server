@@ -19,6 +19,9 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
+// --- SERVE STATIC FILES FIRST ---
+app.use(express.static(path.join(__dirname)));
+
 // --- RENDER ROUTING ---
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/home.html', (req, res) => res.sendFile(path.join(__dirname, 'home.html')));
@@ -26,7 +29,6 @@ app.get('/notification.html', (req, res) => res.sendFile(path.join(__dirname, 'n
 app.get('/search.html', (req, res) => res.sendFile(path.join(__dirname, 'search.html')));
 app.get('/chat.html', (req, res) => res.sendFile(path.join(__dirname, 'chat.html')));
 app.get('/direct.html', (req, res) => res.sendFile(path.join(__dirname, 'direct.html')));
-app.use(express.static(path.join(__dirname)));
 
 const MONGO_URI = "mongodb+srv://olakojotobi89_db_user:VaultPass2026@cluster0.fuesl9b.mongodb.net/vaultDB?retryWrites=true&w=majority";
 mongoose.connect(MONGO_URI).then(() => console.log("🚀 DATABASE CONNECTED")).catch(err => console.log(err));
@@ -77,7 +79,6 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// 1. Posts & Feed Logic
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(50);
@@ -98,9 +99,7 @@ app.delete('/api/posts/:id', async (req, res) => {
         if (post && post.sender === req.body.username) {
             await Post.findByIdAndDelete(req.params.id);
             res.json({ success: true });
-        } else {
-            res.status(403).json({ error: "Unauthorized" });
-        }
+        } else { res.status(403).json({ error: "Unauthorized" }); }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -112,13 +111,10 @@ app.post('/api/posts/:id/like', async (req, res) => {
             post.likes += 1;
             await post.save();
             res.json({ success: true });
-        } else {
-            res.json({ message: "Already liked" });
-        }
+        } else { res.json({ message: "Already liked" }); }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 2. Chat Logic
 app.get('/api/unread-messages-count/:username', async (req, res) => {
     try {
         const count = await Message.countDocuments({ receiver: req.params.username, seen: false });
@@ -167,7 +163,6 @@ app.get('/api/messages/:me/:target', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 3. Auth & Notifications
 app.post('/api/login', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.body.username });
