@@ -119,7 +119,6 @@
         let selectedMedia = null;
         let mediaType = 'image';
 
-        // Initialize socket for likes/notifs
         socket.emit('join_private', myName);
 
         async function loadFeed() {
@@ -141,9 +140,8 @@
                             : `<div class="post-media"><img src="${post.media}" loading="lazy"></div>`;
                     }
 
-                    // Show delete button only if you own the post
                     const deleteBtn = post.sender === myName 
-                        ? `<i class="fas fa-trash-alt" style="opacity:0.4; font-size:14px;" onclick="deletePost('${post._id}')"></i>` 
+                        ? `<i class="fas fa-trash-alt" style="opacity:0.4; font-size:14px; cursor:pointer;" onclick="deletePost('${post._id}')"></i>` 
                         : '';
 
                     postEl.innerHTML = `
@@ -209,24 +207,42 @@
         }
 
         async function deletePost(postId) {
+            if (!postId || postId === 'undefined') {
+                alert("Error: Post ID is missing.");
+                return;
+            }
+
             if (!confirm("Remove this post from the Vault?")) return;
 
             try {
                 const res = await fetch(`/api/posts/${postId}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: myName }) // Authorization check
+                    body: JSON.stringify({ username: myName })
                 });
 
-                const data = await res.json();
-
-                if (data.success) {
-                    const el = document.getElementById(`post-${postId}`);
-                    if (el) el.remove();
+                // Check if the response is actually JSON
+                const contentType = res.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        const el = document.getElementById(`post-${postId}`);
+                        if (el) el.remove();
+                    } else {
+                        alert("Delete failed: " + (data.error || "Unknown error"));
+                    }
                 } else {
-                    alert("Delete failed: " + data.error);
+                    // Handle non-JSON errors (like 404 or 500 html pages)
+                    if (res.ok) {
+                        location.reload(); 
+                    } else {
+                        alert("Server error: " + res.status);
+                    }
                 }
-            } catch (err) { alert("Server error."); }
+            } catch (err) { 
+                console.error("Delete Error:", err);
+                alert("Connection error. Check your internet."); 
+            }
         }
 
         async function likePost(postId, owner) {
