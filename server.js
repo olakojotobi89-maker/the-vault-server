@@ -75,12 +75,12 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
     toUser: { type: String, required: true, index: true },
     fromUser: { type: String, required: true },
     type: { type: String, required: true }, 
-    timestamp: { type: Date, default: Date.now }
+    timestamp: { type: Date, default: Date.now },
+    read: { type: Boolean, default: false } // NEW: Tracks if seen
 }));
 
 // --- API ROUTES ---
 
-// INSTAGRAM STYLE SEARCH
 app.get('/api/users/search', async (req, res) => {
     const query = req.query.q;
     if (!query) return res.json([]);
@@ -92,15 +92,29 @@ app.get('/api/users/search', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Search failed" }); }
 });
 
-// NOTIFICATION SYSTEM
+// GET NOTIFICATIONS: Supports ?unread=true for badge counts
 app.get('/api/notifications/:username', async (req, res) => {
     try {
-        const notifications = await Notification.find({ toUser: req.params.username }).sort({ timestamp: -1 });
+        const unreadOnly = req.query.unread === 'true';
+        let filter = { toUser: req.params.username };
+        if (unreadOnly) filter.read = false;
+
+        const notifications = await Notification.find(filter).sort({ timestamp: -1 });
         res.json(notifications);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Clear All Notifications Route
+// MARK AS READ: Clears unread status for a user
+app.post('/api/notifications/read/:username', async (req, res) => {
+    try {
+        await Notification.updateMany(
+            { toUser: req.params.username, read: false },
+            { $set: { read: true } }
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/notifications/:username', async (req, res) => {
     try {
         await Notification.deleteMany({ toUser: req.params.username });
@@ -130,13 +144,8 @@ app.post('/api/follow', async (req, res) => {
         } else {
             await User.findOneAndUpdate({ username: target }, { $push: { followers: follower } });
             await User.findOneAndUpdate({ username: follower }, { $push: { following: target } });
-            
-            // Create Persistent Follow Notification
             await Notification.create({ toUser: target, fromUser: follower, type: 'follow' });
-            
-            // Emit Socket for Real-time Sound/Badge
             io.to(target).emit('receive_notification', { type: 'follow', from: follower });
-            
             res.json({ success: true, action: "followed", isFollowing: true });
         }
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -166,9 +175,7 @@ app.post('/api/posts/:id/like', async (req, res) => {
             await post.save();
             
             if (post.sender !== username) {
-                // Save to Database
                 await Notification.create({ toUser: post.sender, fromUser: username, type: 'like' });
-                // Notify via Socket
                 io.to(post.sender).emit('receive_like', { sender: username, owner: post.sender });
             }
         }
@@ -215,8 +222,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('send_like', (data) => {
-        // Handled in the API route now for better reliability, 
-        // but kept for compatibility
         io.to(data.owner).emit('receive_like', { sender: data.sender, owner: data.owner });
     });
 });
