@@ -200,6 +200,20 @@ app.get('/api/messages/:me/:target', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// FIX: ADDED MISSING SIGNUP ROUTE
+app.post('/api/signup', async (req, res) => {
+    try {
+        const hashedPassword = await bcrypt.hash(req.body.password, 10);
+        await User.create({ 
+            username: req.body.username, 
+            password: hashedPassword,
+            followers: [],
+            following: []
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(400).json({ error: "Username already taken" }); }
+});
+
 app.post('/api/login', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.body.username });
