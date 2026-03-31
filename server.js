@@ -81,29 +81,32 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// FIX: ADDED FOLLOW/UNFOLLOW PERSISTENCE
+// FIX: ATOMIC FOLLOW/UNFOLLOW PERSISTENCE
 app.post('/api/follow', async (req, res) => {
     const { me, target } = req.body;
+    if (!me || !target) return res.status(400).json({ error: "Missing usernames" });
+    
     try {
         const myUser = await User.findOne({ username: me });
-        const targetUser = await User.findOne({ username: target });
-        if (!myUser || !targetUser) return res.status(404).json({ error: "User not found" });
+        if (!myUser) return res.status(404).json({ error: "User not found" });
 
-        if (!myUser.following.includes(target)) {
-            myUser.following.push(target);
-            targetUser.followers.push(me);
+        const isFollowing = myUser.following.includes(target);
+
+        if (!isFollowing) {
+            // Use $addToSet to prevent duplicates and ensure persistence
+            await User.updateOne({ username: me }, { $addToSet: { following: target } });
+            await User.updateOne({ username: target }, { $addToSet: { followers: me } });
             await Notification.create({ toUser: target, fromUser: me, type: 'follow' });
+            res.json({ success: true, following: true });
         } else {
-            myUser.following = myUser.following.filter(u => u !== target);
-            targetUser.followers = targetUser.followers.filter(u => u !== me);
+            // Use $pull to remove accurately
+            await User.updateOne({ username: me }, { $pull: { following: target } });
+            await User.updateOne({ username: target }, { $pull: { followers: me } });
+            res.json({ success: true, following: false });
         }
-        await myUser.save();
-        await targetUser.save();
-        res.json({ success: true, following: myUser.following.includes(target) });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// FIX: ADDED FOLLOW STATUS CHECK
 app.get('/api/follow-status/:me/:target', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.params.me });
