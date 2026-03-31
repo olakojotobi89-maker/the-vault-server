@@ -19,7 +19,6 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// --- SERVE STATIC FILES FIRST ---
 app.use(express.static(path.join(__dirname)));
 
 // --- RENDER ROUTING ---
@@ -29,6 +28,7 @@ app.get('/notification.html', (req, res) => res.sendFile(path.join(__dirname, 'n
 app.get('/search.html', (req, res) => res.sendFile(path.join(__dirname, 'search.html')));
 app.get('/chat.html', (req, res) => res.sendFile(path.join(__dirname, 'chat.html')));
 app.get('/direct.html', (req, res) => res.sendFile(path.join(__dirname, 'direct.html')));
+app.get('/profile.html', (req, res) => res.sendFile(path.join(__dirname, 'profile.html')));
 
 const MONGO_URI = "mongodb+srv://olakojotobi89_db_user:VaultPass2026@cluster0.fuesl9b.mongodb.net/vaultDB?retryWrites=true&w=majority";
 mongoose.connect(MONGO_URI).then(() => console.log("🚀 DATABASE CONNECTED")).catch(err => console.log(err));
@@ -51,6 +51,7 @@ const User = mongoose.model('User', new mongoose.Schema({
 
 const Post = mongoose.model('Post', new mongoose.Schema({
     sender: { type: String, required: true, index: true },
+    senderPfp: { type: String, default: "" }, // FIX: Store PFP at time of post
     caption: String,
     media: String, 
     type: { type: String, default: 'image' }, 
@@ -79,6 +80,36 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 
 // --- API ROUTES ---
 
+// FIX: Search endpoint
+app.get('/api/users/search', async (req, res) => {
+    const query = req.query.q;
+    if (!query) return res.json([]);
+    try {
+        const users = await User.find({ 
+            username: { $regex: query, $options: 'i' } 
+        }).select('username profilePic bio');
+        res.json(users);
+    } catch (err) { res.status(500).json({ error: "Search failed" }); }
+});
+
+// FIX: Profile endpoint
+app.get('/api/profile/:username', async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.username }).select('-password');
+        if (!user) return res.status(404).json({ error: "User not found" });
+        res.json(user);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// FIX: Update settings (Bio/PFP)
+app.post('/api/update-settings', async (req, res) => {
+    try {
+        const { username, settings } = req.body;
+        await User.findOneAndUpdate({ username }, { $set: settings });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(50);
@@ -86,9 +117,15 @@ app.get('/api/posts', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// FIX: Create post with User Profile Pic
 app.post('/api/posts', async (req, res) => {
     try {
-        const post = await Post.create(req.body);
+        const user = await User.findOne({ username: req.body.sender });
+        const postData = {
+            ...req.body,
+            senderPfp: user ? user.profilePic : ""
+        };
+        const post = await Post.create(postData);
         res.json(post);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
