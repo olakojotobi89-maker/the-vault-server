@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Vault | Discover</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); }
+        body { margin: 0; padding: 0; min-height: 100dvh; background: var(--primary-gradient); font-family: -apple-system, sans-serif; color: white; display: flex; justify-content: center; }
+        .container { width: 95%; max-width: 500px; padding: 20px 0 100px; }
+        
+        /* High-end Search Input */
+        .search-box { 
+            position: sticky; top: 10px; z-index: 100;
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px);
+            border-radius: 20px; padding: 5px 15px; border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex; align-items: center; gap: 10px; margin-bottom: 30px;
+        }
+        .search-box input {
+            flex-grow: 1; background: none; border: none; padding: 12px 0;
+            color: white; font-size: 16px; outline: none;
+        }
+        .search-box i { opacity: 0.6; }
+
+        /* User Card */
+        .user-card {
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(15px);
+            border-radius: 20px; padding: 15px; margin-bottom: 12px;
+            display: flex; align-items: center; justify-content: space-between;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
+        
+        .user-info { display: flex; align-items: center; gap: 15px; }
+        .avatar { 
+            width: 50px; height: 50px; border-radius: 50%; background: #222; 
+            display: flex; align-items: center; justify-content: center; 
+            border: 2px solid #fdbb2d; font-weight: bold; font-size: 20px;
+        }
+        .view-btn { 
+            background: #fdbb2d; color: black; border: none; padding: 8px 15px; 
+            border-radius: 12px; font-size: 12px; font-weight: bold; cursor: pointer;
+        }
+
+        .nav-bottom {
+            position: fixed; bottom: 20px; width: 90%; max-width: 400px;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(20px);
+            border-radius: 30px; padding: 15px 30px; display: flex;
+            justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .nav-item { color: white; opacity: 0.6; font-size: 20px; text-decoration: none; }
+        .nav-item.active { opacity: 1; color: #fdbb2d; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2 style="margin-bottom: 20px; letter-spacing: 1px;">Discover</h2>
+        
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="Search usernames..." onkeyup="handleSearch()">
+        </div>
+
+        <div id="results-list">
+            <p style="text-align:center; opacity:0.5; margin-top:50px;">Type a name to search the Vault</p>
+        </div>
+    </div>
+
+    <nav class="nav-bottom">
+        <a href="home.html" class="nav-item"><i class="fas fa-home"></i></a>
+        <a href="search.html" class="nav-item active"><i class="fas fa-search"></i></a>
+        <a href="chat.html" class="nav-item"><i class="fas fa-comment-alt"></i></a>
+        <a href="profile.html" class="nav-item"><i class="fas fa-user"></i></a>
+    </nav>
+
+    <script>
+        async function handleSearch() {
+            const query = document.getElementById('searchInput').value;
+            const list = document.getElementById('results-list');
+
+            if (query.length < 1) {
+                list.innerHTML = '<p style="text-align:center; opacity:0.5; margin-top:50px;">Type a name to search the Vault</p>';
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/users/search?q=${query}`);
+                const users = await res.json();
+
+                if (users.length === 0) {
+                    list.innerHTML = '<p style="text-align:center; opacity:0.5;">No agents found with that name.</p>';
+                    return;
+                }
+
+                list.innerHTML = users.map(user => `
+                    <div class="user-card" onclick="window.location.href='profile.html?user=${user.username}'">
+                        <div class="user-info">
+                            <div class="avatar">${user.username[0].toUpperCase()}</div>
+                            <div>
+                                <div style="font-weight:700;">${user.username}</div>
+                                <div style="font-size:12px; opacity:0.6;">Vault Member</div>
+                            </div>
+                        </div>
+                        <button class="view-btn">VIEW</button>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+</html>
