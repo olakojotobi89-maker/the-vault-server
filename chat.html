@@ -23,7 +23,7 @@
         .container { width: 95%; max-width: 500px; padding: 20px 0 100px; }
 
         .header {
-            display: flex; align-items: center; gap: 15px; margin-bottom: 25px;
+            display: flex; align-items: center; gap: 15px; margin-bottom: 20px;
             padding: 0 10px;
         }
         .back-btn { color: white; font-size: 20px; text-decoration: none; opacity: 0.8; }
@@ -32,6 +32,20 @@
             background: var(--glass); backdrop-filter: blur(20px);
             border-radius: 25px; border: 1px solid rgba(255, 255, 255, 0.2);
             overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        /* Friends Horizontal List */
+        .friends-tray {
+            display: flex; gap: 15px; overflow-x: auto; padding: 15px;
+            scrollbar-width: none;
+        }
+        .friends-tray::-webkit-scrollbar { display: none; }
+        .friend-item { text-align: center; cursor: pointer; min-width: 60px; }
+        .friend-pfp {
+            width: 55px; height: 55px; border-radius: 50%; border: 2px solid #fdbb2d;
+            background: #222; display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 5px; font-weight: bold; font-size: 20px;
         }
 
         .chat-item {
@@ -41,7 +55,6 @@
         }
         .chat-item:last-child { border-bottom: none; }
         .chat-item:hover { background: rgba(255, 255, 255, 0.05); }
-        .chat-item:active { background: rgba(255, 255, 255, 0.15); transform: scale(0.98); }
 
         .chat-info { display: flex; align-items: center; gap: 15px; }
 
@@ -60,7 +73,6 @@
             padding: 0 5px;
         }
 
-        /* Bottom Nav */
         .nav-bottom {
             position: fixed; bottom: 20px; width: 90%; max-width: 400px;
             background: rgba(0,0,0,0.6); backdrop-filter: blur(20px);
@@ -80,6 +92,13 @@
             <h2 style="margin:0; letter-spacing: 1px;">Messages</h2>
         </div>
 
+        <div class="glass-card">
+            <div style="padding: 12px 15px 0; font-size: 12px; font-weight: bold; color: #fdbb2d; opacity: 0.8;">FOLLOWING</div>
+            <div class="friends-tray" id="friends-list">
+                <div style="opacity: 0.3; font-size: 11px; padding: 10px;">Loading friends...</div>
+            </div>
+        </div>
+
         <div class="glass-card" id="chat-partners-list">
             <div style="padding: 40px; text-align: center; opacity: 0.5; font-style: italic;">
                 Opening your vault...
@@ -97,6 +116,30 @@
     <script>
         const myName = localStorage.getItem('vault_username');
 
+        // NEW: Function to load people you follow
+        async function loadFriends() {
+            try {
+                const res = await fetch(`/api/profile/${myName}`);
+                const data = await res.json();
+                const friendsList = document.getElementById('friends-list');
+                const following = data.following || [];
+
+                if (following.length === 0) {
+                    friendsList.innerHTML = `<div style="padding: 10px; font-size: 11px; opacity: 0.5;">Follow others to start a chat</div>`;
+                    return;
+                }
+
+                friendsList.innerHTML = following.map(username => `
+                    <div class="friend-item" onclick="location.href='direct.html?user=${username}'">
+                        <div class="friend-pfp">${username[0].toUpperCase()}</div>
+                        <div style="font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${username}</div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error("Failed to load friends:", err);
+            }
+        }
+
         async function loadChatList() {
             try {
                 const res = await fetch(`/api/chat-list/${myName}`);
@@ -111,7 +154,7 @@
                 list.innerHTML = users.map(user => `
                     <div class="chat-item" onclick="location.href='direct.html?user=${user.username}'">
                         <div class="chat-info">
-                            <img src="${user.profilePic || 'default-pfp.png'}" class="pfp">
+                            <div class="pfp">${user.username[0].toUpperCase()}</div>
                             <span style="font-weight: 600;">${user.username}</span>
                         </div>
                         
@@ -125,7 +168,11 @@
             }
         }
 
+        // Initialize
+        loadFriends();
         loadChatList();
+        
+        // Auto refresh Inbox every 10s
         setInterval(loadChatList, 10000);
     </script>
 </body>
