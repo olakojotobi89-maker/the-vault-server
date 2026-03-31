@@ -81,9 +81,10 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 
 // --- API ROUTES ---
 
+// FIX: HIGH-RELIABILITY FOLLOW PERSISTENCE
 app.post('/api/follow', async (req, res) => {
     const { me, target } = req.body;
-    if (!me || !target) return res.status(400).json({ error: "Missing usernames" });
+    if (!me || !target || me === target) return res.status(400).json({ error: "Invalid usernames" });
     
     try {
         const myUser = await User.findOne({ username: me });
@@ -92,19 +93,23 @@ app.post('/api/follow', async (req, res) => {
         const isFollowing = myUser.following.includes(target);
 
         if (!isFollowing) {
-            await User.updateOne({ username: me }, { $addToSet: { following: target } });
-            await User.updateOne({ username: target }, { $addToSet: { followers: me } });
-            
-            // Create DB Notification
-            const notif = await Notification.create({ toUser: target, fromUser: me, type: 'follow' });
-            
-            // Trigger Real-time Sound/Badge
-            io.to(target).emit('receive_notification', notif);
+            // ATOMIC UPDATE FOR BOTH USERS
+            await Promise.all([
+                User.updateOne({ username: me }, { $addToSet: { following: target } }),
+                User.updateOne({ username: target }, { $addToSet: { followers: me } }),
+                Notification.create({ toUser: target, fromUser: me, type: 'follow' })
+            ]);
+
+            // Emit for real-time sound/badge
+            io.to(target).emit('receive_notification', { fromUser: me, type: 'follow' });
             
             res.json({ success: true, following: true });
         } else {
-            await User.updateOne({ username: me }, { $pull: { following: target } });
-            await User.updateOne({ username: target }, { $pull: { followers: me } });
+            // ATOMIC REMOVAL
+            await Promise.all([
+                User.updateOne({ username: me }, { $pull: { following: target } }),
+                User.updateOne({ username: target }, { $pull: { followers: me } })
+            ]);
             res.json({ success: true, following: false });
         }
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -118,14 +123,12 @@ app.post('/api/posts/:id/like', async (req, res) => {
             post.likes += 1;
             await post.save();
 
-            // Create DB Notification
             const notif = await Notification.create({ 
                 toUser: post.sender, 
                 fromUser: req.body.username, 
                 type: 'like' 
             });
 
-            // Trigger Real-time Sound/Badge
             io.to(post.sender).emit('receive_notification', notif);
 
             res.json({ success: true });
@@ -274,7 +277,6 @@ app.get('/api/notifications/:username', async (req, res) => {
 io.on('connection', (socket) => {
     socket.on('join_private', (username) => {
         socket.join(username);
-        console.log(`📡 User ${username} connected for notifications.`);
     });
 
     socket.on('send_message', async (data) => {
