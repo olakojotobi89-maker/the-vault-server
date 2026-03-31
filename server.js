@@ -15,14 +15,16 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// --- BODY PARSER LIMITS (Fixes "Post not going" for large images) ---
+// --- BODY PARSER LIMITS ---
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// --- RENDER ROUTING ---
+// --- RENDER ROUTING (Fixes "Cannot GET" errors) ---
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/home', (req, res) => res.sendFile(path.join(__dirname, 'home.html')));
+app.get('/home.html', (req, res) => res.sendFile(path.join(__dirname, 'home.html')));
+app.get('/notification.html', (req, res) => res.sendFile(path.join(__dirname, 'notification.html')));
+app.get('/search.html', (req, res) => res.sendFile(path.join(__dirname, 'search.html')));
 app.use(express.static(path.join(__dirname)));
 
 // --- MONGODB ---
@@ -69,9 +71,36 @@ const Message = mongoose.model('Message', new mongoose.Schema({
     seen: { type: Boolean, default: false }
 }));
 
+// New Notification Schema to keep history forever
+const Notification = mongoose.model('Notification', new mongoose.Schema({
+    toUser: { type: String, required: true, index: true },
+    fromUser: { type: String, required: true },
+    type: { type: String, required: true }, // 'like', 'comment', 'follow'
+    timestamp: { type: Date, default: Date.now }
+}));
+
 // --- API ROUTES ---
 
-// Check if user follows another (For the UI button)
+// INSTAGRAM STYLE SEARCH: Finds users by name and returns profile pics
+app.get('/api/users/search', async (req, res) => {
+    const query = req.query.q;
+    if (!query) return res.json([]);
+    try {
+        const users = await User.find({ 
+            username: { $regex: query, $options: 'i' } 
+        }).select('username profilePic');
+        res.json(users);
+    } catch (err) { res.status(500).json({ error: "Search failed" }); }
+});
+
+// GET NOTIFICATIONS: Pulls all activity for a specific user
+app.get('/api/notifications/:username', async (req, res) => {
+    try {
+        const notifications = await Notification.find({ toUser: req.params.username }).sort({ timestamp: -1 });
+        res.json(notifications);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/follow-status/:me/:target', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.params.me });
@@ -94,6 +123,8 @@ app.post('/api/follow', async (req, res) => {
         } else {
             await User.findOneAndUpdate({ username: target }, { $push: { followers: follower } });
             await User.findOneAndUpdate({ username: follower }, { $push: { following: target } });
+            // Save notification for follow
+            await Notification.create({ toUser: target, fromUser: follower, type: 'follow' });
             res.json({ success: true, action: "followed", isFollowing: true });
         }
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -101,7 +132,6 @@ app.post('/api/follow', async (req, res) => {
 
 app.get('/api/posts', async (req, res) => {
     try {
-        // Removed .limit(50) so all posts stay visible forever
         const posts = await Post.find().sort({ timestamp: -1 });
         res.json(posts);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -111,7 +141,25 @@ app.post('/api/posts', async (req, res) => {
     try {
         const newPost = await Post.create(req.body);
         res.json({ success: true, post: newPost });
-    } catch (err) { res.status(500).json({ error: "Post failed. Content might be too large." }); }
+    } catch (err) { res.status(500).json({ error: "Post failed" }); }
+});
+
+// LIKE ROUTE: Updated to save notification
+app.post('/api/posts/:id/like', async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
+        const { username } = req.body;
+        if (!post.likedBy.includes(username)) {
+            post.likedBy.push(username);
+            post.likes += 1;
+            await post.save();
+            // Only notify if liking someone else's post
+            if (post.sender !== username) {
+                await Notification.create({ toUser: post.sender, fromUser: username, type: 'like' });
+            }
+        }
+        res.json({ success: true, likes: post.likes });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/profile/:username', async (req, res) => {
