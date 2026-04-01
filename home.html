@@ -178,15 +178,15 @@
                 postEl.className = 'glass-card post';
                 postEl.id = `post-${post._id}`;
                 
+                // PERFORMANCE FIX: Added loading="lazy" for images and preload="metadata" for videos
                 let mediaHtml = post.media ? (post.type === 'video' 
-                    ? `<div class="post-media"><video src="${post.media}" controls></video></div>`
+                    ? `<div class="post-media"><video src="${post.media}" controls preload="metadata" playsinline></video></div>`
                     : `<div class="post-media"><img src="${post.media}" loading="lazy"></div>`) : '';
 
                 const deleteBtn = post.sender === myName 
                     ? `<i class="fas fa-trash-alt" style="opacity:0.4; font-size:14px;" onclick="deletePost('${post._id}')"></i>` 
                     : '';
 
-                // Show TikTok-style Follow button ONLY if it's not my post
                 const followBtn = post.sender !== myName 
                     ? `<div class="follow-plus" onclick="followUser(event, '${post.sender}')"><i class="fas fa-plus"></i></div>` 
                     : '';
@@ -196,7 +196,7 @@
                         <div class="user-info" onclick="window.location.href='profile.html?user=${post.sender}'">
                             <div class="pfp-container">
                                 <div class="pfp-small">
-                                    <img src="${post.senderPfp || 'https://via.placeholder.com/150'}" alt="">
+                                    <img src="${post.senderPfp || 'https://via.placeholder.com/150'}" alt="" loading="lazy">
                                 </div>
                                 ${followBtn}
                             </div>
@@ -222,7 +222,7 @@
         }
 
         async function followUser(event, targetUser) {
-            event.stopPropagation(); // Prevents clicking the user-info link
+            event.stopPropagation();
             try {
                 const res = await fetch('/api/follow', {
                     method: 'POST',
@@ -232,7 +232,7 @@
                 const data = await res.json();
                 if (data.success) {
                     alert(data.following ? `Following ${targetUser}` : `Unfollowed ${targetUser}`);
-                    loadFeed(); // Refresh to hide plus sign if needed
+                    loadFeed();
                 }
             } catch (err) { console.error("Follow error"); }
         }
