@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vault | Post</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); --glass: rgba(255, 255, 255, 0.1); }
+        body { margin: 0; background: var(--primary-gradient); font-family: sans-serif; color: white; display: flex; justify-content: center; min-height: 100vh; }
+        .container { width: 95%; max-width: 500px; padding: 20px 0 100px; }
+        .glass-card { background: var(--glass); backdrop-filter: blur(20px); border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); overflow: hidden; margin-bottom: 20px; }
+        .post-img { width: 100%; display: block; }
+        .comment-section { padding: 15px; }
+        .comment { margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 5px; }
+        .comment b { color: #fdbb2d; margin-right: 5px; }
+        .input-area { position: fixed; bottom: 20px; width: 90%; max-width: 460px; display: flex; gap: 10px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 50px; }
+        input { flex: 1; background: transparent; border: none; color: white; padding: 10px; outline: none; }
+        button { background: #fdbb2d; border: none; padding: 10px 20px; border-radius: 50px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="post-content"></div>
+        <div class="glass-card comment-section" id="comments-list"></div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="comment-input" placeholder="Add a comment...">
+        <button onclick="sendComment()">Post</button>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const postId = urlParams.get('id');
+        const myName = localStorage.getItem('vault_username');
+
+        async function loadPost() {
+            const res = await fetch(`/api/posts`); // We'll filter for the specific ID
+            const posts = await res.json();
+            const post = posts.find(p => p._id === postId);
+            
+            if(!post) return;
+
+            document.getElementById('post-content').innerHTML = `
+                <div class="glass-card">
+                    <div style="padding:15px;"><b>${post.sender}</b></div>
+                    ${post.media ? `<img src="${post.media}" class="post-img">` : ''}
+                    <div style="padding:15px;">${post.caption}</div>
+                </div>
+            `;
+
+            const commentsDiv = document.getElementById('comments-list');
+            commentsDiv.innerHTML = post.comments.map(c => `
+                <div class="comment"><b>${c.user}</b> ${c.text}</div>
+            `).join('') || '<p style="opacity:0.5; text-align:center;">No comments yet.</p>';
+        }
+
+        async function sendComment() {
+            const text = document.getElementById('comment-input').value;
+            if(!text) return;
+
+            await fetch(`/api/posts/${postId}/comment`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username: myName, text: text })
+            });
+
+            document.getElementById('comment-input').value = '';
+            loadPost();
+        }
+
+        loadPost();
+    </script>
+</body>
+</html>
