@@ -83,7 +83,7 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// ADDED COMMENT API
+// FIXED: COMMENT API WITH NOTIFICATIONS
 app.post('/api/posts/:id/comment', async (req, res) => {
     try {
         const post = await Post.findById(req.params.id);
@@ -91,6 +91,17 @@ app.post('/api/posts/:id/comment', async (req, res) => {
         
         post.comments.push({ user: req.body.username, text: req.body.text });
         await post.save();
+
+        // Send notification to post owner if someone else comments
+        if (post.sender !== req.body.username) {
+            const notif = await Notification.create({ 
+                toUser: post.sender, 
+                fromUser: req.body.username, 
+                type: 'comment' 
+            });
+            io.to(post.sender).emit('receive_notification', notif);
+        }
+
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
