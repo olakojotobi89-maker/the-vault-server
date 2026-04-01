@@ -54,6 +54,17 @@ const User = mongoose.model('User', new mongoose.Schema({
     }
 }));
 
+// NEW: Group Schema (WhatsApp Style)
+const Group = mongoose.model('Group', new mongoose.Schema({
+    name: { type: String, required: true },
+    description: { type: String, default: "A private Vault group." },
+    groupPic: { type: String, default: "" },
+    admin: { type: String, required: true }, 
+    members: [{ type: String }], 
+    isLocked: { type: Boolean, default: false }, 
+    timestamp: { type: Date, default: Date.now }
+}));
+
 const Post = mongoose.model('Post', new mongoose.Schema({
     sender: { type: String, required: true, index: true },
     senderPfp: { type: String, default: "" },
@@ -75,6 +86,15 @@ const Message = mongoose.model('Message', new mongoose.Schema({
     seen: { type: Boolean, default: false }
 }));
 
+// NEW: Group Message Schema
+const GroupMessage = mongoose.model('GroupMessage', new mongoose.Schema({
+    groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', index: true },
+    sender: { type: String, required: true },
+    content: { type: String, required: true },
+    type: { type: String, default: 'text' },
+    timestamp: { type: Date, default: Date.now }
+}));
+
 const Notification = mongoose.model('Notification', new mongoose.Schema({
     toUser: { type: String, required: true, index: true },
     fromUser: { type: String, required: true },
@@ -85,24 +105,60 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 
 // --- API ROUTES ---
 
+// GROUP ROUTES
+app.post('/api/groups/create', async (req, res) => {
+    try {
+        const { name, admin, members, description, groupPic } = req.body;
+        const newGroup = await Group.create({
+            name, admin, description, groupPic,
+            members: [admin, ...members] 
+        });
+        res.json({ success: true, group: newGroup });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/groups/my-groups/:username', async (req, res) => {
+    try {
+        const groups = await Group.find({ members: req.params.username });
+        res.json(groups);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/groups/:id/manage-member', async (req, res) => {
+    try {
+        const { adminUser, targetUser, action } = req.body; // action: 'add' or 'remove'
+        const group = await Group.findById(req.params.id);
+        if (group.admin !== adminUser) return res.status(403).json({ error: "Only Admin can manage members" });
+        
+        const update = action === 'add' ? { $addToSet: { members: targetUser } } : { $pull: { members: targetUser } };
+        await Group.findByIdAndUpdate(req.params.id, update);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/groups/:id/lock', async (req, res) => {
+    try {
+        const { adminUser, lockStatus } = req.body;
+        const group = await Group.findById(req.params.id);
+        if (group.admin !== adminUser) return res.status(403).json({ error: "Unauthorized" });
+        group.isLocked = lockStatus;
+        await group.save();
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// EXISTING ROUTES (MINIMIZED FOR VIEWING)
 app.post('/api/posts/:id/comment', async (req, res) => {
     try {
         const post = await Post.findById(req.params.id);
         if (!post) return res.status(404).json({ error: "Post not found" });
-        
         post.comments.push({ user: req.body.username, text: req.body.text });
         await post.save();
-
         if (post.sender !== req.body.username) {
-            const notif = await Notification.create({ 
-                toUser: post.sender, 
-                fromUser: req.body.username, 
-                type: 'comment' 
-            });
+            const notif = await Notification.create({ toUser: post.sender, fromUser: req.body.username, type: 'comment' });
             io.to(post.sender).emit('receive_notification', notif);
             io.to(post.sender).emit('update_badge');
         }
-
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -110,24 +166,18 @@ app.post('/api/posts/:id/comment', async (req, res) => {
 app.post('/api/follow', async (req, res) => {
     const { me, target } = req.body;
     if (!me || !target || me === target) return res.status(400).json({ error: "Invalid usernames" });
-    
     try {
         const myUser = await User.findOne({ username: me });
         if (!myUser) return res.status(404).json({ error: "User not found" });
-
         const isFollowing = myUser.following.includes(target);
-
         if (!isFollowing) {
             const notif = await Notification.create({ toUser: target, fromUser: me, type: 'follow' });
-            
             await Promise.all([
                 User.updateOne({ username: me }, { $addToSet: { following: target } }),
                 User.updateOne({ username: target }, { $addToSet: { followers: me } })
             ]);
-
             io.to(target).emit('receive_notification', notif);
             io.to(target).emit('update_badge'); 
-            
             res.json({ success: true, following: true });
         } else {
             await Promise.all([
@@ -146,13 +196,7 @@ app.post('/api/posts/:id/like', async (req, res) => {
             post.likedBy.push(req.body.username);
             post.likes += 1;
             await post.save();
-
-            const notif = await Notification.create({ 
-                toUser: post.sender, 
-                fromUser: req.body.username, 
-                type: 'like' 
-            });
-
+            const notif = await Notification.create({ toUser: post.sender, fromUser: req.body.username, type: 'like' });
             io.to(post.sender).emit('receive_notification', notif);
             io.to(post.sender).emit('update_badge');
             res.json({ success: true });
@@ -172,9 +216,7 @@ app.get('/api/users/search', async (req, res) => {
     const query = req.query.q;
     if (!query) return res.json([]);
     try {
-        const users = await User.find({ 
-            username: { $regex: query, $options: 'i' } 
-        }).select('username profilePic bio');
+        const users = await User.find({ username: { $regex: query, $options: 'i' } }).select('username profilePic bio');
         res.json(users);
     } catch (err) { res.status(500).json({ error: "Search failed" }); }
 });
@@ -195,7 +237,6 @@ app.post('/api/update-settings', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// FIXED: Reduced limit to 10 for speed
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(10);
@@ -203,7 +244,6 @@ app.get('/api/posts', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// NEW: Added fast count for profile page
 app.get('/api/posts/count/:username', async (req, res) => {
     try {
         const count = await Post.countDocuments({ sender: req.params.username });
@@ -255,11 +295,7 @@ app.get('/api/chat-list/:username', async (req, res) => {
             const unreadCount = await Message.countDocuments({
                 sender: u.username, receiver: username, seen: false
             });
-            return { 
-                username: u.username, 
-                profilePic: u.profilePic, 
-                unreadCount 
-            };
+            return { username: u.username, profilePic: u.profilePic, unreadCount };
         }));
         res.json(chatList);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -284,12 +320,7 @@ app.get('/api/messages/:me/:target', async (req, res) => {
 app.post('/api/signup', async (req, res) => {
     try {
         const hashedPassword = await bcrypt.hash(req.body.password, 10);
-        await User.create({ 
-            username: req.body.username, 
-            password: hashedPassword,
-            followers: [],
-            following: []
-        });
+        await User.create({ username: req.body.username, password: hashedPassword, followers: [], following: [] });
         res.json({ success: true });
     } catch (err) { res.status(400).json({ error: "Username already taken" }); }
 });
@@ -312,9 +343,9 @@ app.get('/api/notifications/:username', async (req, res) => {
 
 // --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
-    socket.on('join_private', (username) => {
-        socket.join(username);
-    });
+    socket.on('join_private', (username) => socket.join(username));
+
+    socket.on('join_group', (groupId) => socket.join(groupId));
 
     socket.on('send_message', async (data) => {
         try {
@@ -322,6 +353,13 @@ io.on('connection', (socket) => {
             io.to(data.receiver).emit('receive_message', newMessage);
             io.to(data.sender).emit('receive_message', newMessage);
             io.to(data.receiver).emit('update_badge'); 
+        } catch (err) { console.error(err); }
+    });
+
+    socket.on('send_group_message', async (data) => {
+        try {
+            const groupMsg = await GroupMessage.create(data);
+            io.to(data.groupId).emit('receive_group_message', groupMsg);
         } catch (err) { console.error(err); }
     });
 
