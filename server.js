@@ -1,6 +1,6 @@
 require('dotenv').config(); 
 const express = require('express');
-const compression = require('compression'); // ADDED ONLY THIS
+const compression = require('compression'); 
 const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
@@ -9,7 +9,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs'); 
 
 const app = express();
-app.use(compression()); // ADDED ONLY THIS
+app.use(compression()); 
 
 const server = http.createServer(app);
 const io = new Server(server, { 
@@ -33,7 +33,6 @@ app.get('/search.html', (req, res) => res.sendFile(path.join(__dirname, 'search.
 app.get('/chat.html', (req, res) => res.sendFile(path.join(__dirname, 'chat.html')));
 app.get('/direct.html', (req, res) => res.sendFile(path.join(__dirname, 'direct.html')));
 app.get('/profile.html', (req, res) => res.sendFile(path.join(__dirname, 'profile.html')));
-// ADDED FOR COMMENTS
 app.get('/post-details.html', (req, res) => res.sendFile(path.join(__dirname, 'post-details.html')));
 
 const MONGO_URI = "mongodb+srv://olakojotobi89_db_user:VaultPass2026@cluster0.fuesl9b.mongodb.net/vaultDB?retryWrites=true&w=majority";
@@ -86,7 +85,6 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// FIXED: COMMENT API WITH NOTIFICATIONS
 app.post('/api/posts/:id/comment', async (req, res) => {
     try {
         const post = await Post.findById(req.params.id);
@@ -95,7 +93,6 @@ app.post('/api/posts/:id/comment', async (req, res) => {
         post.comments.push({ user: req.body.username, text: req.body.text });
         await post.save();
 
-        // Send notification to post owner if someone else comments
         if (post.sender !== req.body.username) {
             const notif = await Notification.create({ 
                 toUser: post.sender, 
@@ -103,6 +100,7 @@ app.post('/api/posts/:id/comment', async (req, res) => {
                 type: 'comment' 
             });
             io.to(post.sender).emit('receive_notification', notif);
+            io.to(post.sender).emit('update_badge');
         }
 
         res.json({ success: true });
@@ -120,13 +118,16 @@ app.post('/api/follow', async (req, res) => {
         const isFollowing = myUser.following.includes(target);
 
         if (!isFollowing) {
+            const notif = await Notification.create({ toUser: target, fromUser: me, type: 'follow' });
+            
             await Promise.all([
                 User.updateOne({ username: me }, { $addToSet: { following: target } }),
-                User.updateOne({ username: target }, { $addToSet: { followers: me } }),
-                Notification.create({ toUser: target, fromUser: me, type: 'follow' })
+                User.updateOne({ username: target }, { $addToSet: { followers: me } })
             ]);
 
-            io.to(target).emit('receive_notification', { fromUser: me, type: 'follow' });
+            io.to(target).emit('receive_notification', notif);
+            io.to(target).emit('update_badge'); 
+            
             res.json({ success: true, following: true });
         } else {
             await Promise.all([
@@ -153,6 +154,7 @@ app.post('/api/posts/:id/like', async (req, res) => {
             });
 
             io.to(post.sender).emit('receive_notification', notif);
+            io.to(post.sender).emit('update_badge');
             res.json({ success: true });
         } else { res.json({ message: "Already liked" }); }
     } catch (err) { res.status(500).json({ error: err.message }); }
