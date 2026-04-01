@@ -34,7 +34,6 @@
         input { flex: 1; background: var(--glass); border: 1px solid rgba(255,255,255,0.2); padding: 12px 18px; border-radius: 25px; color: white; outline: none; }
         .send-btn { width: 45px; height: 45px; border-radius: 50%; background: var(--primary); border: none; color: black; display: flex; align-items: center; justify-content: center; }
 
-        /* Admin Panel Modal */
         .modal { display: none; position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); align-items: center; justify-content: center; }
         .modal-content { background: #222; width: 90%; max-width: 400px; border-radius: 25px; padding: 20px; }
         .member-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -71,16 +70,16 @@
             <p id="group-desc-modal" style="font-size: 12px; opacity: 0.7;"></p>
             
             <div id="admin-controls" style="display: none;">
-                <input type="text" id="new-member-name" placeholder="Username to add..." style="width: 100%; margin-bottom: 10px;">
-                <button onclick="manageMember('add')" style="background: var(--primary); border:none; padding: 10px; width: 100%; border-radius: 10px; font-weight:bold;">Add Member</button>
+                <input type="text" id="new-member-name" placeholder="Username to add..." style="width: 100%; margin-bottom: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 10px; border-radius: 10px; color: white;">
+                <button onclick="manageMember('add')" style="background: var(--primary); border:none; padding: 10px; width: 100%; border-radius: 10px; font-weight:bold; cursor: pointer;">Add Member</button>
             </div>
 
             <div style="margin-top: 20px;">
-                <h4 style="font-size: 14px;">Members</h4>
-                <div id="member-list"></div>
+                <h4 style="font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">Members</h4>
+                <div id="member-list" style="max-height: 200px; overflow-y: auto;"></div>
             </div>
             
-            <button onclick="toggleModal(false)" style="margin-top: 20px; width: 100%; background: #444; border:none; padding: 10px; color:white; border-radius:10px;">Close</button>
+            <button onclick="toggleModal(false)" style="margin-top: 20px; width: 100%; background: #444; border:none; padding: 10px; color:white; border-radius:10px; cursor: pointer;">Close</button>
         </div>
     </div>
 
@@ -95,39 +94,56 @@
 
         async function initChat() {
             if (groupId) {
+                // Fetch group data
                 const res = await fetch(`/api/groups/my-groups/${myName}`);
                 const groups = await res.json();
                 groupData = groups.find(g => g._id === groupId);
                 
-                if (!groupData) return window.location.href = 'chat.html';
+                if (!groupData) {
+                    console.error("Access Denied: Not a member of this group.");
+                    return window.location.href = 'chat.html';
+                }
 
                 document.getElementById('target-name').innerText = groupData.name;
                 document.getElementById('target-status').innerText = `${groupData.members.length} members`;
                 document.getElementById('admin-icon').style.display = 'block';
-                if(groupData.groupPic) document.getElementById('target-pfp').innerHTML = `<img src="${groupData.groupPic}">`;
                 
+                if(groupData.groupPic) {
+                    document.getElementById('target-pfp').innerHTML = `<img src="${groupData.groupPic}">`;
+                } else {
+                    document.getElementById('target-pfp').innerHTML = `<i class="fas fa-users"></i>`;
+                }
+                
+                // Join the Socket.io room for this group
                 socket.emit('join_group', groupId);
                 loadGroupHistory();
             } else {
+                if(!targetUser) return window.location.href = 'chat.html';
                 document.getElementById('target-name').innerText = targetUser;
                 document.getElementById('target-status').innerText = 'Online';
+                document.getElementById('target-pfp').innerText = targetUser[0].toUpperCase();
+                
                 socket.emit('join_private', myName);
                 loadPrivateHistory();
             }
         }
 
         async function loadPrivateHistory() {
-            const res = await fetch(`/api/messages/${myName}/${targetUser}`);
-            const msgs = await res.json();
-            document.getElementById('chat-window').innerHTML = msgs.map(m => renderMsg(m)).join('');
-            scrollToBottom();
+            try {
+                const res = await fetch(`/api/messages/${myName}/${targetUser}`);
+                const msgs = await res.json();
+                document.getElementById('chat-window').innerHTML = msgs.map(m => renderMsg(m)).join('');
+                scrollToBottom();
+            } catch(e) { console.error("History fail:", e); }
         }
 
         async function loadGroupHistory() {
-            const res = await fetch(`/api/messages/group/${groupId}`);
-            const msgs = await res.json();
-            document.getElementById('chat-window').innerHTML = msgs.map(m => renderMsg(m, true)).join('');
-            scrollToBottom();
+            try {
+                const res = await fetch(`/api/messages/group/${groupId}`);
+                const msgs = await res.json();
+                document.getElementById('chat-window').innerHTML = msgs.map(m => renderMsg(m, true)).join('');
+                scrollToBottom();
+            } catch(e) { console.error("Group history fail:", e); }
         }
 
         function renderMsg(m, isGroup = false) {
@@ -172,34 +188,51 @@
             }
         });
 
-        // Admin Management Logic
         function toggleModal(show) {
-            document.getElementById('adminModal').style.display = show ? 'flex' : 'none';
+            const modal = document.getElementById('adminModal');
+            modal.style.display = show ? 'flex' : 'none';
+            
             if(show && groupData) {
                 document.getElementById('group-title-modal').innerText = groupData.name;
-                document.getElementById('group-desc-modal').innerText = groupData.description;
-                if(groupData.admin === myName) document.getElementById('admin-controls').style.display = 'block';
+                document.getElementById('group-desc-modal').innerText = groupData.description || "Private Vault Group";
+                
+                const isAdmin = groupData.admin === myName;
+                document.getElementById('admin-controls').style.display = isAdmin ? 'block' : 'none';
                 
                 document.getElementById('member-list').innerHTML = groupData.members.map(m => `
                     <div class="member-item">
                         <span>${m} ${m === groupData.admin ? '<small>(Admin)</small>' : ''}</span>
-                        ${groupData.admin === myName && m !== myName ? `<button onclick="manageMember('remove', '${m}')" style="background:none; border:none; color:#ff4444;"><i class="fas fa-user-minus"></i></button>` : ''}
+                        ${isAdmin && m !== myName ? 
+                            `<button onclick="manageMember('remove', '${m}')" style="background:none; border:none; color:#ff4444; cursor:pointer;"><i class="fas fa-user-minus"></i></button>` 
+                            : ''}
                     </div>
                 `).join('');
             }
         }
 
         async function manageMember(action, target) {
-            const targetUser = target || document.getElementById('new-member-name').value;
-            const res = await fetch(`/api/groups/${groupId}/manage-member`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ adminUser: myName, targetUser, action })
-            });
-            if(res.ok) { alert(`Success!`); location.reload(); }
+            const targetToManage = target || document.getElementById('new-member-name').value.trim();
+            if(!targetToManage) return;
+
+            try {
+                const res = await fetch(`/api/groups/${groupId}/manage-member`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminUser: myName, targetUser: targetToManage, action })
+                });
+                if(res.ok) {
+                    location.reload(); 
+                } else {
+                    const err = await res.json();
+                    alert(err.message || "Failed to update member");
+                }
+            } catch(e) { alert("Error connecting to server."); }
         }
 
-        function scrollToBottom() { const win = document.getElementById('chat-window'); win.scrollTop = win.scrollHeight; }
+        function scrollToBottom() { 
+            const win = document.getElementById('chat-window'); 
+            win.scrollTop = win.scrollHeight; 
+        }
 
         initChat();
     </script>
