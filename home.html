@@ -55,8 +55,23 @@
         
         .post-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .user-info { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .pfp-small { width: 35px; height: 35px; border-radius: 50%; background: #222; display: flex; align-items: center; justify-content: center; border: 1.5px solid #fdbb2d; overflow: hidden; }
+        
+        /* TikTok-Style PFP Wrapper */
+        .pfp-container { position: relative; width: 45px; height: 45px; }
+        .pfp-small { 
+            width: 45px; height: 45px; border-radius: 50%; background: #222; 
+            display: flex; align-items: center; justify-content: center; 
+            border: 2px solid #fdbb2d; overflow: hidden; 
+        }
         .pfp-small img { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* Follow Plus Sign */
+        .follow-plus {
+            position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%);
+            background: #fdbb2d; color: black; width: 18px; height: 18px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: bold; border: 2px solid #1a2a6c;
+        }
 
         .post-media { width: 100%; border-radius: 20px; margin: 10px 0; overflow: hidden; background: rgba(0,0,0,0.3); }
         .post-media img, .post-media video { width: 100%; display: block; }
@@ -133,7 +148,7 @@
         const myName = localStorage.getItem('vault_username');
         let selectedMedia = null;
         let mediaType = 'image';
-        let allPosts = []; // Global posts for search
+        let allPosts = [];
 
         socket.emit('join_private', myName);
 
@@ -145,7 +160,6 @@
             } catch (err) { console.error("Feed Error:", err); }
         }
 
-        // --- SEARCH FUNCTIONALITY ---
         function filterFeed() {
             const term = document.getElementById('userSearch').value.toLowerCase();
             const filtered = allPosts.filter(post => 
@@ -159,7 +173,7 @@
             const feed = document.getElementById('vault-feed');
             feed.innerHTML = '';
 
-            posts.forEach(post => {
+            posts.forEach(async (post) => {
                 const postEl = document.createElement('div');
                 postEl.className = 'glass-card post';
                 postEl.id = `post-${post._id}`;
@@ -172,11 +186,20 @@
                     ? `<i class="fas fa-trash-alt" style="opacity:0.4; font-size:14px;" onclick="deletePost('${post._id}')"></i>` 
                     : '';
 
-                // ADDED COMMENT COUNT LOGIC BELOW
+                // Show TikTok-style Follow button ONLY if it's not my post
+                const followBtn = post.sender !== myName 
+                    ? `<div class="follow-plus" onclick="followUser(event, '${post.sender}')"><i class="fas fa-plus"></i></div>` 
+                    : '';
+
                 postEl.innerHTML = `
                     <div class="post-header">
                         <div class="user-info" onclick="window.location.href='profile.html?user=${post.sender}'">
-                            <div class="pfp-small">${post.sender[0].toUpperCase()}</div>
+                            <div class="pfp-container">
+                                <div class="pfp-small">
+                                    <img src="${post.senderPfp || 'https://via.placeholder.com/150'}" alt="">
+                                </div>
+                                ${followBtn}
+                            </div>
                             <span style="font-weight:600; font-size:14px;">${post.sender}</span>
                         </div>
                         ${deleteBtn}
@@ -196,6 +219,22 @@
                 `;
                 feed.appendChild(postEl);
             });
+        }
+
+        async function followUser(event, targetUser) {
+            event.stopPropagation(); // Prevents clicking the user-info link
+            try {
+                const res = await fetch('/api/follow', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ me: myName, target: targetUser })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(data.following ? `Following ${targetUser}` : `Unfollowed ${targetUser}`);
+                    loadFeed(); // Refresh to hide plus sign if needed
+                }
+            } catch (err) { console.error("Follow error"); }
         }
 
         async function submitPost() {
@@ -267,10 +306,8 @@
             }
         }
 
-        // --- BADGE LOGIC ---
         async function updateBadges() {
             try {
-                // Notifications
                 const nRes = await fetch(`/api/notifications/${myName}`);
                 const nData = await nRes.json();
                 const unreadNotifs = nData.filter(n => !n.read).length;
@@ -280,7 +317,6 @@
                     nBadge.style.display = unreadNotifs > 0 ? 'block' : 'none';
                 }
 
-                // Chat Messages
                 const cRes = await fetch(`/api/unread-messages-count/${myName}`);
                 const cData = await cRes.json();
                 const cBadge = document.getElementById('chat-badge');
@@ -295,7 +331,6 @@
             if (data.owner === myName) updateBadges();
         });
 
-        // ADDED: Socket listener for comment notifications
         socket.on('receive_notification', (data) => {
             if (data.toUser === myName) updateBadges();
         });
