@@ -54,7 +54,6 @@ const User = mongoose.model('User', new mongoose.Schema({
     }
 }));
 
-// NEW: Group Schema (WhatsApp Style)
 const Group = mongoose.model('Group', new mongoose.Schema({
     name: { type: String, required: true },
     description: { type: String, default: "A private Vault group." },
@@ -86,7 +85,6 @@ const Message = mongoose.model('Message', new mongoose.Schema({
     seen: { type: Boolean, default: false }
 }));
 
-// NEW: Group Message Schema
 const GroupMessage = mongoose.model('GroupMessage', new mongoose.Schema({
     groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', index: true },
     sender: { type: String, required: true },
@@ -105,7 +103,14 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 
 // --- API ROUTES ---
 
-// GROUP ROUTES
+// NEW: Group Message History Route
+app.get('/api/messages/group/:groupId', async (req, res) => {
+    try {
+        const msgs = await GroupMessage.find({ groupId: req.params.groupId }).sort({ timestamp: 1 });
+        res.json(msgs);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/groups/create', async (req, res) => {
     try {
         const { name, admin, members, description, groupPic } = req.body;
@@ -126,7 +131,7 @@ app.get('/api/groups/my-groups/:username', async (req, res) => {
 
 app.post('/api/groups/:id/manage-member', async (req, res) => {
     try {
-        const { adminUser, targetUser, action } = req.body; // action: 'add' or 'remove'
+        const { adminUser, targetUser, action } = req.body; 
         const group = await Group.findById(req.params.id);
         if (group.admin !== adminUser) return res.status(403).json({ error: "Only Admin can manage members" });
         
@@ -136,18 +141,35 @@ app.post('/api/groups/:id/manage-member', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/groups/:id/lock', async (req, res) => {
+// UPDATED: Added Group lookup to the main chat list
+app.get('/api/chat-list/:username', async (req, res) => {
     try {
-        const { adminUser, lockStatus } = req.body;
-        const group = await Group.findById(req.params.id);
-        if (group.admin !== adminUser) return res.status(403).json({ error: "Unauthorized" });
-        group.isLocked = lockStatus;
-        await group.save();
-        res.json({ success: true });
+        const username = req.params.username;
+        
+        // Find Private Message Partners
+        const messages = await Message.find({
+            $or: [{ sender: username }, { receiver: username }]
+        }).sort({ timestamp: -1 });
+
+        const partners = new Set();
+        messages.forEach(msg => {
+            if (msg.sender !== username) partners.add(msg.sender);
+            if (msg.receiver !== username) partners.add(msg.receiver);
+        });
+
+        const users = await User.find({ username: { $in: Array.from(partners) } }).select('username profilePic');
+        const chatList = await Promise.all(users.map(async (u) => {
+            const unreadCount = await Message.countDocuments({
+                sender: u.username, receiver: username, seen: false
+            });
+            return { username: u.username, profilePic: u.profilePic, unreadCount, type: 'private' };
+        }));
+
+        res.json(chatList);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// EXISTING ROUTES (MINIMIZED FOR VIEWING)
+// EXISTING LOGIC
 app.post('/api/posts/:id/comment', async (req, res) => {
     try {
         const post = await Post.findById(req.params.id);
@@ -277,30 +299,6 @@ app.get('/api/unread-messages-count/:username', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/chat-list/:username', async (req, res) => {
-    try {
-        const username = req.params.username;
-        const messages = await Message.find({
-            $or: [{ sender: username }, { receiver: username }]
-        }).sort({ timestamp: -1 });
-
-        const partners = new Set();
-        messages.forEach(msg => {
-            if (msg.sender !== username) partners.add(msg.sender);
-            if (msg.receiver !== username) partners.add(msg.receiver);
-        });
-
-        const users = await User.find({ username: { $in: Array.from(partners) } }).select('username profilePic');
-        const chatList = await Promise.all(users.map(async (u) => {
-            const unreadCount = await Message.countDocuments({
-                sender: u.username, receiver: username, seen: false
-            });
-            return { username: u.username, profilePic: u.profilePic, unreadCount };
-        }));
-        res.json(chatList);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 app.get('/api/messages/:me/:target', async (req, res) => {
     try {
         await Message.updateMany(
@@ -344,7 +342,6 @@ app.get('/api/notifications/:username', async (req, res) => {
 // --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
     socket.on('join_private', (username) => socket.join(username));
-
     socket.on('join_group', (groupId) => socket.join(groupId));
 
     socket.on('send_message', async (data) => {
@@ -358,7 +355,13 @@ io.on('connection', (socket) => {
 
     socket.on('send_group_message', async (data) => {
         try {
-            const groupMsg = await GroupMessage.create(data);
+            // FIXED: Ensuring groupId is handled correctly as ObjectId
+            const groupMsg = await GroupMessage.create({
+                groupId: data.groupId,
+                sender: data.sender,
+                content: data.content,
+                timestamp: new Date()
+            });
             io.to(data.groupId).emit('receive_group_message', groupMsg);
         } catch (err) { console.error(err); }
     });
