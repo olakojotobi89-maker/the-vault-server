@@ -195,10 +195,19 @@ app.post('/api/update-settings', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// FIXED: Reduced limit to 10 for speed
 app.get('/api/posts', async (req, res) => {
     try {
-        const posts = await Post.find().sort({ timestamp: -1 }).limit(50);
+        const posts = await Post.find().sort({ timestamp: -1 }).limit(10);
         res.json(posts);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// NEW: Added fast count for profile page
+app.get('/api/posts/count/:username', async (req, res) => {
+    try {
+        const count = await Post.countDocuments({ sender: req.params.username });
+        res.json({ count });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
