@@ -1,107 +1,273 @@
-<script>
-    const myName = localStorage.getItem('vault_username');
-
-    function toggleModal(show) {
-        document.getElementById('groupModal').style.display = show ? 'flex' : 'none';
-    }
-
-    async function createGroup() {
-        const name = document.getElementById('groupName').value.trim();
-        const description = document.getElementById('groupDesc').value.trim();
-        const groupPic = document.getElementById('groupPfp').value.trim();
-
-        if(!name) return alert("Group name required");
-
-        const res = await fetch('/api/groups/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            // We send an empty array; the server logic already does [admin, ...members]
-            body: JSON.stringify({ name, description, groupPic, admin: myName, members: [] })
-        });
-
-        if(res.ok) {
-            alert("Group Created! Go to Group Info inside the chat to add members.");
-            toggleModal(false);
-            loadChatList();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Vault | Messages</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { 
+            --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); 
+            --glass: rgba(255, 255, 255, 0.1);
         }
-    }
 
-    async function loadFriends() {
-        try {
-            const res = await fetch(`/api/profile/${myName}`);
-            const data = await res.json();
-            const friendsList = document.getElementById('friends-list');
-            const following = data.following || [];
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-            if (following.length === 0) {
-                friendsList.innerHTML = '<div style="font-size:10px; opacity:0.5; padding:10px;">Not following anyone</div>';
-                return;
-            }
+        body {
+            margin: 0; padding: 0; min-height: 100dvh;
+            background: var(--primary-gradient);
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            color: white; display: flex; justify-content: center;
+        }
 
-            friendsList.innerHTML = (await Promise.all(following.map(async username => {
-                const userRes = await fetch(`/api/profile/${username}`);
-                const user = await userRes.json();
-                return `
-                    <div class="friend-item" onclick="location.href='direct.html?user=${username}'">
-                        <div class="pfp-circle">
-                            ${user.profilePic ? `<img src="${user.profilePic}">` : username[0].toUpperCase()}
-                        </div>
-                        <div style="font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${username}</div>
-                    </div>
-                `;
-            }))).join('');
-        } catch (err) { console.error(err); }
-    }
+        .container { width: 95%; max-width: 500px; padding: 20px 0 100px; }
 
-    async function loadChatList() {
-        try {
-            const [dmRes, groupRes] = await Promise.all([
-                fetch(`/api/chat-list/${myName}`),
-                fetch(`/api/groups/my-groups/${myName}`)
-            ]);
+        .header {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
+            padding: 0 10px;
+        }
+        .back-btn { color: white; font-size: 20px; text-decoration: none; opacity: 0.8; }
+        .create-btn { color: #fdbb2d; font-size: 18px; cursor: pointer; transition: 0.3s; }
+        .create-btn:hover { transform: scale(1.1); }
+
+        .glass-card {
+            background: var(--glass); backdrop-filter: blur(20px);
+            border-radius: 25px; border: 1px solid rgba(255, 255, 255, 0.2);
+            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        /* Friends Tray */
+        .friends-tray {
+            display: flex; gap: 15px; overflow-x: auto; padding: 15px;
+            scrollbar-width: none;
+        }
+        .friends-tray::-webkit-scrollbar { display: none; }
+        .friend-item { text-align: center; cursor: pointer; min-width: 60px; }
+        .pfp-circle {
+            width: 55px; height: 55px; border-radius: 50%; border: 2px solid #fdbb2d;
+            background: #222; overflow: hidden; display: flex; align-items: center; 
+            justify-content: center; margin: 0 auto 5px; font-weight: bold; font-size: 20px;
+        }
+        .pfp-circle img { width: 100%; height: 100%; object-fit: cover; }
+
+        .chat-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 18px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer; transition: 0.3s;
+        }
+        .chat-item:last-child { border-bottom: none; }
+        .chat-item:hover { background: rgba(255, 255, 255, 0.05); }
+
+        .chat-info { display: flex; align-items: center; gap: 15px; }
+
+        .pfp {
+            width: 48px; height: 48px; border-radius: 50%;
+            border: 1.5px solid #fdbb2d; object-fit: cover;
+            background: #222; overflow: hidden; display: flex; align-items: center; 
+            justify-content: center; font-weight: bold;
+        }
+        .pfp img { width: 100%; height: 100%; object-fit: cover; }
+
+        .unread-badge {
+            background: #fdbb2d; color: black;
+            font-size: 11px; font-weight: bold;
+            min-width: 20px; height: 20px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0 5px;
+        }
+
+        /* Modal / Popup Styling */
+        .modal {
+            display: none; position: fixed; inset: 0; z-index: 2000;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+            align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background: #222; width: 90%; max-width: 400px;
+            border-radius: 25px; padding: 25px; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .input-box {
+            width: 100%; background: #333; border: none; color: white;
+            padding: 12px 15px; border-radius: 12px; margin-top: 10px; margin-bottom: 15px;
+        }
+        .btn-main {
+            width: 100%; background: #fdbb2d; border: none; padding: 12px;
+            border-radius: 12px; font-weight: bold; cursor: pointer; color: black;
+        }
+
+        .nav-bottom {
+            position: fixed; bottom: 20px; width: 90%; max-width: 400px;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(20px);
+            border-radius: 30px; padding: 15px 30px; display: flex;
+            justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1);
+            z-index: 1000;
+        }
+        .nav-item { color: white; opacity: 0.6; font-size: 20px; text-decoration: none; }
+        .nav-item.active { opacity: 1; color: #fdbb2d; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <a href="home.html" class="back-btn"><i class="fas fa-chevron-left"></i></a>
+                <h2 style="margin:0; letter-spacing: 1px;">Messages</h2>
+            </div>
+            <div class="create-btn" onclick="toggleModal(true)"><i class="fas fa-users-cog"></i></div>
+        </div>
+
+        <div class="glass-card">
+            <div style="padding: 12px 15px 0; font-size: 12px; font-weight: bold; color: #fdbb2d; opacity: 0.8;">FOLLOWING</div>
+            <div class="friends-tray" id="friends-list"></div>
+        </div>
+
+        <div class="glass-card" id="chat-partners-list">
+            <div style="padding: 40px; text-align: center; opacity: 0.5; font-style: italic;">Opening your vault...</div>
+        </div>
+    </div>
+
+    <div id="groupModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">Create Group</h3>
+            <label style="font-size: 12px; opacity: 0.6;">GROUP NAME</label>
+            <input type="text" id="groupName" class="input-box" placeholder="e.g. Squad Only">
             
-            const dms = await dmRes.json();
-            const groups = await groupRes.json();
-            const list = document.getElementById('chat-partners-list');
-            let html = '';
+            <label style="font-size: 12px; opacity: 0.6;">DESCRIPTION</label>
+            <input type="text" id="groupDesc" class="input-box" placeholder="What's this group about?">
 
-            // Render Groups (This shows for anyone in the 'members' list)
-            groups.forEach(group => {
-                html += `
-                    <div class="chat-item" onclick="location.href='direct.html?groupId=${group._id}'">
-                        <div class="chat-info">
-                            <div class="pfp" style="border-color: #00ff88;">
-                                ${group.groupPic ? `<img src="${group.groupPic}">` : `<i class="fas fa-users"></i>`}
-                            </div>
-                            <div>
-                                <div style="font-weight: 600;">${group.name}</div>
-                                <div style="font-size: 10px; opacity: 0.5;">${group.members.length} Members</div>
-                            </div>
-                        </div>
-                        <i class="fas fa-chevron-right" style="opacity: 0.2; font-size: 12px;"></i>
-                    </div>
-                `;
+            <label style="font-size: 12px; opacity: 0.6;">GROUP PFP URL (OPTIONAL)</label>
+            <input type="text" id="groupPfp" class="input-box" placeholder="Image URL">
+
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-main" onclick="createGroup()">Create</button>
+                <button class="btn-main" style="background: #444; color: white;" onclick="toggleModal(false)">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <nav class="nav-bottom">
+        <a href="home.html" class="nav-item"><i class="fas fa-home"></i></a>
+        <a href="search.html" class="nav-item"><i class="fas fa-search"></i></a>
+        <a href="chat.html" class="nav-item active"><i class="fas fa-comment-alt"></i></a>
+        <a href="profile.html" class="nav-item"><i class="fas fa-user"></i></a>
+    </nav>
+
+    <script>
+        const myName = localStorage.getItem('vault_username');
+
+        function toggleModal(show) {
+            document.getElementById('groupModal').style.display = show ? 'flex' : 'none';
+        }
+
+        async function createGroup() {
+            const name = document.getElementById('groupName').value.trim();
+            const description = document.getElementById('groupDesc').value.trim();
+            const groupPic = document.getElementById('groupPfp').value.trim();
+
+            if(!name) return alert("Group name required");
+
+            const res = await fetch('/api/groups/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                // Sending members as an empty array - the server logic typically handles adding the admin
+                body: JSON.stringify({ name, description, groupPic, admin: myName, members: [] })
             });
 
-            // Render DMs
-            dms.forEach(user => {
-                html += `
-                    <div class="chat-item" onclick="location.href='direct.html?user=${user.username}'">
-                        <div class="chat-info">
-                            <div class="pfp">
-                                ${user.profilePic ? `<img src="${user.profilePic}">` : user.username[0].toUpperCase()}
+            if(res.ok) {
+                alert("Group Created!");
+                toggleModal(false);
+                loadChatList();
+            }
+        }
+
+        async function loadFriends() {
+            try {
+                const res = await fetch(`/api/profile/${myName}`);
+                const data = await res.json();
+                const friendsList = document.getElementById('friends-list');
+                const following = data.following || [];
+
+                if (following.length === 0) {
+                    friendsList.innerHTML = '<div style="padding:10px; font-size:10px; opacity:0.5;">Not following anyone</div>';
+                    return;
+                }
+
+                friendsList.innerHTML = (await Promise.all(following.map(async username => {
+                    try {
+                        const userRes = await fetch(`/api/profile/${username}`);
+                        const user = await userRes.json();
+                        return `
+                            <div class="friend-item" onclick="location.href='direct.html?user=${username}'">
+                                <div class="pfp-circle">
+                                    ${user.profilePic ? `<img src="${user.profilePic}">` : username[0].toUpperCase()}
+                                </div>
+                                <div style="font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${username}</div>
                             </div>
-                            <span style="font-weight: 600;">${user.username}</span>
+                        `;
+                    } catch(e) { return ''; }
+                }))).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        async function loadChatList() {
+            try {
+                // Fetch DMs and Groups simultaneously for speed
+                const [dmRes, groupRes] = await Promise.all([
+                    fetch(`/api/chat-list/${myName}`),
+                    fetch(`/api/groups/my-groups/${myName}`)
+                ]);
+
+                const dms = await dmRes.json();
+                const groups = await groupRes.json();
+
+                const list = document.getElementById('chat-partners-list');
+                let html = '';
+
+                // Render Groups (Visibility fix: Now shows for every member)
+                groups.forEach(group => {
+                    html += `
+                        <div class="chat-item" onclick="location.href='direct.html?groupId=${group._id}'">
+                            <div class="chat-info">
+                                <div class="pfp" style="border-color: #00ff88;">
+                                    ${group.groupPic ? `<img src="${group.groupPic}">` : `<i class="fas fa-users"></i>`}
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600;">${group.name}</div>
+                                    <div style="font-size: 10px; opacity: 0.5;">Group Vault</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right" style="opacity: 0.2; font-size: 12px;"></i>
                         </div>
-                        ${user.unreadCount > 0 ? `<div class="unread-badge">${user.unreadCount}</div>` : '<i class="fas fa-chevron-right" style="opacity: 0.2; font-size: 12px;"></i>'}
-                    </div>
-                `;
-            });
+                    `;
+                });
 
-            list.innerHTML = html || `<div style="padding: 40px; text-align: center; opacity: 0.5;">No active chats.</div>`;
-        } catch (err) { console.error(err); }
-    }
+                // Render Private DMs
+                dms.forEach(user => {
+                    html += `
+                        <div class="chat-item" onclick="location.href='direct.html?user=${user.username}'">
+                            <div class="chat-info">
+                                <div class="pfp">
+                                    ${user.profilePic ? `<img src="${user.profilePic}">` : user.username[0].toUpperCase()}
+                                </div>
+                                <span style="font-weight: 600;">${user.username}</span>
+                            </div>
+                            ${user.unreadCount > 0 ? `<div class="unread-badge">${user.unreadCount}</div>` : '<i class="fas fa-chevron-right" style="opacity: 0.2; font-size: 12px;"></i>'}
+                        </div>
+                    `;
+                });
 
-    loadFriends();
-    loadChatList();
-</script>
+                list.innerHTML = html || `<div style="padding: 40px; text-align: center; opacity: 0.5;">No active chats.</div>`;
+            } catch (err) { console.error("Failed to load chat list:", err); }
+        }
+
+        // Initial Load
+        loadFriends();
+        loadChatList();
+        
+        // Refresh the list every 10 seconds to catch new groups/messages
+        setInterval(loadChatList, 10000);
+    </script>
+</body>
+</html>
