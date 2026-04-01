@@ -30,6 +30,8 @@ app.get('/search.html', (req, res) => res.sendFile(path.join(__dirname, 'search.
 app.get('/chat.html', (req, res) => res.sendFile(path.join(__dirname, 'chat.html')));
 app.get('/direct.html', (req, res) => res.sendFile(path.join(__dirname, 'direct.html')));
 app.get('/profile.html', (req, res) => res.sendFile(path.join(__dirname, 'profile.html')));
+// ADDED FOR COMMENTS
+app.get('/post-details.html', (req, res) => res.sendFile(path.join(__dirname, 'post-details.html')));
 
 const MONGO_URI = "mongodb+srv://olakojotobi89_db_user:VaultPass2026@cluster0.fuesl9b.mongodb.net/vaultDB?retryWrites=true&w=majority";
 mongoose.connect(MONGO_URI).then(() => console.log("🚀 DATABASE CONNECTED")).catch(err => console.log(err));
@@ -80,6 +82,18 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 }));
 
 // --- API ROUTES ---
+
+// ADDED COMMENT API
+app.post('/api/posts/:id/comment', async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
+        if (!post) return res.status(404).json({ error: "Post not found" });
+        
+        post.comments.push({ user: req.body.username, text: req.body.text });
+        await post.save();
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.post('/api/follow', async (req, res) => {
     const { me, target } = req.body;
@@ -198,7 +212,6 @@ app.get('/api/unread-messages-count/:username', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// FIXED: Ensuring partner profile pictures are returned in chat list
 app.get('/api/chat-list/:username', async (req, res) => {
     try {
         const username = req.params.username;
