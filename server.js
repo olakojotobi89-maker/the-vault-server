@@ -1,5 +1,6 @@
 require('dotenv').config(); 
 const express = require('express');
+const compression = require('compression'); // ADDED ONLY THIS
 const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
@@ -8,6 +9,8 @@ const path = require('path');
 const bcrypt = require('bcryptjs'); 
 
 const app = express();
+app.use(compression()); // ADDED ONLY THIS
+
 const server = http.createServer(app);
 const io = new Server(server, { 
     cors: { origin: "*", methods: ["GET", "POST"] } 
