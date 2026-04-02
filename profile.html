@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Vault | Profile</title>
 
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VaultChat">
+    <link rel="apple-touch-icon" href="vault-logo.png">
+    <link rel="apple-touch-startup-image" href="vault-logo.png">
+
     <script>
         if (!localStorage.getItem('vault_username')) {
             window.location.href = 'index.html';
@@ -18,14 +25,22 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
-            margin: 0; padding: 20px 0; min-height: 100dvh;
+            margin: 0; padding: 0; min-height: 100dvh;
             display: flex; justify-content: center;
             background: var(--primary-gradient);
-            font-family: -apple-system, sans-serif; color: white;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; color: white;
             overflow-x: hidden;
         }
         
-        .container { width: 95%; max-width: 500px; display: flex; flex-direction: column; gap: 20px; padding-bottom: 40px; }
+        .container { 
+            width: 95%; 
+            max-width: 500px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 20px; 
+            padding-bottom: 60px;
+            padding-top: calc(20px + env(safe-area-inset-top)); /* Support for iOS Notch */
+        }
         
         .glass-card {
             background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(25px);
@@ -66,7 +81,6 @@
         .follow-btn { background: #fdbb2d; color: black; border: none; }
         .follow-btn.following { background: rgba(255,255,255,0.2); color: white; }
 
-        /* Logout Button Specific Style */
         .logout-btn { 
             border: 1px solid rgba(255, 75, 43, 0.5); 
             color: #ff4b2b;
@@ -161,6 +175,15 @@
     </div>
 
     <script>
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Vault Profile PWA Ready'))
+                    .catch(err => console.log('PWA Error', err));
+            });
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const profileUser = urlParams.get('user') || localStorage.getItem('vault_username');
         const myName = localStorage.getItem('vault_username');
@@ -314,7 +337,6 @@
             };
         }
 
-        // FIXED: Using 'me' to match server.js requirements
         async function handleFollow() {
             const fBtn = document.getElementById('follow-btn');
             try {
@@ -332,7 +354,7 @@
                         fBtn.innerText = "Follow";
                         fBtn.classList.remove('following');
                     }
-                    initProfile(); // Refresh followers count immediately
+                    initProfile(); 
                 }
             } catch(e) { console.error("Follow error:", e); }
         }
