@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BBNT | Recovery</title>
+
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VaultChat">
+    <link rel="apple-touch-icon" href="vault-logo.png">
+    <link rel="apple-touch-startup-image" href="vault-logo.png">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body {
@@ -54,13 +62,22 @@
     </div>
 
     <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Vault PWA Ready'))
+                    .catch(err => console.log('PWA Error', err));
+            });
+        }
+
         let currentUser = "";
 
         async function sendOTP() {
             const contact = document.getElementById('contact').value;
             if(!contact) return alert("Please enter your info");
 
-            const res = await fetch('http://localhost:3000/api/forgot-password', {
+            const res = await fetch('/api/forgot-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ contact })
@@ -83,7 +100,7 @@
 
             if(!otp || !newPassword) return alert("Fill all fields");
 
-            const res = await fetch('http://localhost:3000/api/verify-and-reset', {
+            const res = await fetch('/api/verify-and-reset', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: currentUser, otp, newPassword })
