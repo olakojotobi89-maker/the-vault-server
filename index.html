@@ -2,9 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Private Vault | Login</title>
     
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VaultChat">
+    <link rel="apple-touch-icon" href="vault-logo.png">
+    <link rel="apple-touch-startup-image" href="vault-logo.png">
+
     <link rel="stylesheet" href="style.css">
 
     <script>
@@ -109,11 +116,19 @@
     </div>
 
     <script>
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('Vault PWA Ready'))
+                .catch(err => console.log('PWA Error', err));
+        });
+    }
+
     async function handleAuth(type) {
         const username = document.getElementById('usernameInput').value;
         const password = document.getElementById('passwordInput').value;
 
-        // Use a relative URL to avoid CORS or port issues with VPNs
         const url = `/api/${type}`;
 
         try {
@@ -132,17 +147,14 @@
                 localStorage.setItem('vault_username', username);
                 window.location.href = 'home.html'; 
             } else {
-                // If it's the specific "login error" message, it usually means 
-                // the server caught an error but didn't specify what.
                 alert("Vault Access Denied: " + (data.error || "Incorrect credentials"));
             }
         } catch (err) {
             console.error("❌ Fetch Error:", err);
-            alert("Connection Failed! Ensure your Vault Server is active and VPN is connected.");
+            alert("Connection Failed! Ensure your Vault Server is active.");
         }
     }
 
-    // Fixed the event listener to properly handle the async function
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         await handleAuth('login');
