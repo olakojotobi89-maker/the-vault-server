@@ -1,0 +1,31 @@
+{
+  "name": "VaultChat Messenger",
+  "short_name": "VaultChat",
+  "description": "Secure private and group messaging vault.",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a2a6c",
+  "theme_color": "#1a2a6c",
+  "icons": [
+    {
+      "src": "vault-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "vault-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "vault-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
