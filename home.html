@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Vault | Home</title>
     
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VaultChat">
+    <link rel="apple-touch-icon" href="vault-logo.png">
+    <link rel="apple-touch-startup-image" href="vault-logo.png">
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
         if (!localStorage.getItem('vault_username')) {
@@ -144,6 +151,15 @@
     </nav>
 
     <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Vault PWA Ready'))
+                    .catch(err => console.log('PWA Error', err));
+            });
+        }
+
         const socket = io();
         const myName = localStorage.getItem('vault_username');
         let selectedMedia = null;
@@ -178,7 +194,6 @@
                 postEl.className = 'glass-card post';
                 postEl.id = `post-${post._id}`;
                 
-                // PERFORMANCE FIX: Added loading="lazy" for images and preload="metadata" for videos
                 let mediaHtml = post.media ? (post.type === 'video' 
                     ? `<div class="post-media"><video src="${post.media}" controls preload="metadata" playsinline></video></div>`
                     : `<div class="post-media"><img src="${post.media}" loading="lazy"></div>`) : '';
