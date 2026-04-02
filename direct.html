@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Vault | Direct</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VaultChat">
+    <link rel="apple-touch-icon" href="vault-logo.png">
+    <link rel="apple-touch-startup-image" href="vault-logo.png">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="/socket.io/socket.io.js"></script>
     <style>
@@ -18,6 +26,7 @@
         .chat-header {
             padding: 15px; background: rgba(0,0,0,0.3); backdrop-filter: blur(20px);
             display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-top: calc(15px + env(safe-area-inset-top)); /* Support for Dynamic Island/Notch */
         }
         .user-info { display: flex; align-items: center; gap: 10px; cursor: pointer; }
         .pfp-small { width: 35px; height: 35px; border-radius: 50%; background: #222; border: 1px solid var(--primary); display:flex; align-items:center; justify-content:center; font-weight:bold; overflow: hidden; }
@@ -84,6 +93,15 @@
     </div>
 
     <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Vault PWA Ready'))
+                    .catch(err => console.log('PWA Error', err));
+            });
+        }
+
         const socket = io();
         const myName = localStorage.getItem('vault_username');
         const urlParams = new URLSearchParams(window.location.search);
@@ -94,13 +112,11 @@
 
         async function initChat() {
             if (groupId) {
-                // Fetch group data
                 const res = await fetch(`/api/groups/my-groups/${myName}`);
                 const groups = await res.json();
                 groupData = groups.find(g => g._id === groupId);
                 
                 if (!groupData) {
-                    console.error("Access Denied: Not a member of this group.");
                     return window.location.href = 'chat.html';
                 }
 
@@ -114,7 +130,6 @@
                     document.getElementById('target-pfp').innerHTML = `<i class="fas fa-users"></i>`;
                 }
                 
-                // Join the Socket.io room for this group
                 socket.emit('join_group', groupId);
                 loadGroupHistory();
             } else {
