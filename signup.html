@@ -2,121 +2,166 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Private Vault | Register</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Vault | Create Account</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VaultChat">
+    <link rel="apple-touch-icon" href="vault-logo.png">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <style>
+        :root { --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); }
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
         body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-            font-family: -apple-system, sans-serif;
+            margin: 0; padding: 0; height: 100dvh;
+            display: flex; justify-content: center; align-items: center;
+            background: var(--primary-gradient);
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
             overflow: hidden;
         }
+
         .login-card {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             padding: 40px 30px;
             border-radius: 40px;
-            width: 85%;
-            max-width: 350px;
+            width: 90%;
+            max-width: 380px;
             text-align: center;
             color: white;
-            box-shadow: 0 40px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 40px 60px rgba(0, 0, 0, 0.4);
+            /* Padding adjustment for notch if needed */
+            margin-top: env(safe-area-inset-top);
         }
+
         .avatar {
-            font-size: 40px;
+            font-size: 30px;
             background: rgba(255, 255, 255, 0.1);
-            width: 80px;
-            height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 70px; height: 70px;
+            display: flex; align-items: center; justify-content: center;
             border-radius: 50%;
-            margin: 0 auto 20px;
-            border: 2px solid rgba(255, 255, 255, 0.5);
+            margin: 0 auto 15px;
+            border: 2px solid #fdbb2d;
+            color: #fdbb2d;
         }
+
+        h2 { margin: 10px 0 5px; font-size: 26px; letter-spacing: -1px; }
+        p { margin: 0 0 25px; opacity: 0.6; font-size: 14px; }
+
         input {
             width: 100%;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 15px;
-            border: none;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-radius: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
             outline: none;
-            box-sizing: border-box;
+            font-size: 16px; /* Prevents iOS zoom */
+            transition: 0.3s;
         }
+
+        input::placeholder { color: rgba(255, 255, 255, 0.4); }
+        input:focus { background: rgba(255, 255, 255, 0.15); border-color: rgba(255, 255, 255, 0.3); }
+
         .signup-btn {
             width: 100%;
-            padding: 15px;
-            border-radius: 15px;
+            padding: 16px;
+            margin-top: 10px;
+            border-radius: 18px;
             border: none;
-            background: #2ecc71;
-            color: white;
-            font-weight: bold;
-            font-size: 18px;
+            background: #fdbb2d;
+            color: #1a2a6c;
+            font-weight: 800;
+            font-size: 17px;
             cursor: pointer;
+            transition: 0.3s;
         }
+
+        .signup-btn:active { transform: scale(0.96); opacity: 0.9; }
+
         .link {
-            margin-top: 15px;
+            margin-top: 20px;
             display: block;
             color: white;
             text-decoration: none;
             font-size: 14px;
+            opacity: 0.7;
         }
+        
+        .link:active { opacity: 1; }
     </style>
 </head>
 <body>
 
     <div class="login-card">
-        <div class="avatar">📝</div>
+        <div class="avatar"><i class="fas fa-user-plus"></i></div>
         <h2>Create Account</h2>
-        <p>Join the Private Vault</p>
+        <p>Enter your details to join the Vault</p>
         
         <form id="signup-form">
-            <input type="text" id="reg-user" placeholder="Choose Username" required>
-            <input type="email" id="reg-email" placeholder="Email Address" required>
-            <input type="tel" id="reg-phone" placeholder="Phone Number" required>
-            <input type="password" id="reg-pass" placeholder="Choose Password" required>
-            <button type="submit" class="signup-btn">Register</button>
+            <input type="text" id="reg-user" placeholder="Username" required autocomplete="username">
+            <input type="email" id="reg-email" placeholder="Email Address" required autocomplete="email">
+            <input type="tel" id="reg-phone" placeholder="Phone Number" required autocomplete="tel">
+            <input type="password" id="reg-pass" placeholder="Password" required autocomplete="new-password">
+            <button type="submit" class="signup-btn">Get Started</button>
         </form>
         <a href="login.html" class="link">Already have an account? Login</a>
     </div>
 
     <script>
-    document.getElementById('signup-form').onsubmit = async (e) => {
-        e.preventDefault();
-        
-        const username = document.getElementById('reg-user').value;
-        const email = document.getElementById('reg-email').value;
-        const phone = document.getElementById('reg-phone').value;
-        const password = document.getElementById('reg-pass').value;
-
-        try {
-            // FIXED: Removed localhost so it works on Render
-            const response = await fetch('/api/signup', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, email, phone })
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(err => console.log(err));
             });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                alert("Account created! Redirecting to login...");
-                window.location.href = 'login.html'; // REDIRECT TO LOGIN
-            } else {
-                alert("Error: " + data.error);
-            }
-        } catch (err) {
-            alert("Could not connect to the vault. Please try again in a moment!");
         }
-    };
+
+        document.getElementById('signup-form').onsubmit = async (e) => {
+            e.preventDefault();
+            
+            const signupBtn = e.target.querySelector('button');
+            signupBtn.innerText = "Securing Vault...";
+            signupBtn.disabled = true;
+
+            const username = document.getElementById('reg-user').value;
+            const email = document.getElementById('reg-email').value;
+            const phone = document.getElementById('reg-phone').value;
+            const password = document.getElementById('reg-pass').value;
+
+            try {
+                const response = await fetch('/api/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, email, phone })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    signupBtn.innerText = "Access Granted!";
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 1000);
+                } else {
+                    alert("Error: " + data.error);
+                    signupBtn.innerText = "Get Started";
+                    signupBtn.disabled = false;
+                }
+            } catch (err) {
+                alert("Vault Offline. Check connection.");
+                signupBtn.innerText = "Get Started";
+                signupBtn.disabled = false;
+            }
+        };
     </script>
 
 </body>
