@@ -4,11 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Vault | Messages</title>
+
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VaultChat">
+    <link rel="apple-touch-icon" href="vault-logo.png">
+    <link rel="apple-touch-startup-image" href="vault-logo.png">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root { 
             --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); 
             --glass: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Support for iOS Safe Areas */
+        header, .container {
+            padding-top: env(safe-area-inset-top);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -102,6 +115,7 @@
             border-radius: 30px; padding: 15px 30px; display: flex;
             justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1);
             z-index: 1000;
+            padding-bottom: calc(15px + env(safe-area-inset-bottom));
         }
         .nav-item { color: white; opacity: 0.6; font-size: 20px; text-decoration: none; }
         .nav-item.active { opacity: 1; color: #fdbb2d; }
@@ -155,6 +169,15 @@
     </nav>
 
     <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Vault PWA Ready'))
+                    .catch(err => console.log('PWA Error', err));
+            });
+        }
+
         const myName = localStorage.getItem('vault_username');
 
         function toggleModal(show) {
@@ -171,7 +194,6 @@
             const res = await fetch('/api/groups/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // Sending members as an empty array - the server logic typically handles adding the admin
                 body: JSON.stringify({ name, description, groupPic, admin: myName, members: [] })
             });
 
@@ -213,7 +235,6 @@
 
         async function loadChatList() {
             try {
-                // Fetch DMs and Groups simultaneously for speed
                 const [dmRes, groupRes] = await Promise.all([
                     fetch(`/api/chat-list/${myName}`),
                     fetch(`/api/groups/my-groups/${myName}`)
@@ -225,7 +246,6 @@
                 const list = document.getElementById('chat-partners-list');
                 let html = '';
 
-                // Render Groups (Visibility fix: Now shows for every member)
                 groups.forEach(group => {
                     html += `
                         <div class="chat-item" onclick="location.href='direct.html?groupId=${group._id}'">
@@ -243,7 +263,6 @@
                     `;
                 });
 
-                // Render Private DMs
                 dms.forEach(user => {
                     html += `
                         <div class="chat-item" onclick="location.href='direct.html?user=${user.username}'">
@@ -262,11 +281,8 @@
             } catch (err) { console.error("Failed to load chat list:", err); }
         }
 
-        // Initial Load
         loadFriends();
         loadChatList();
-        
-        // Refresh the list every 10 seconds to catch new groups/messages
         setInterval(loadChatList, 10000);
     </script>
 </body>
