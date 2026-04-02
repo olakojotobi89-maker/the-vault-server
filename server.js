@@ -25,9 +25,11 @@ app.use(cors());
 app.use(express.static(path.join(__dirname)));
 
 const MONGO_URI = "mongodb+srv://olakojotobi89_db_user:VaultPass2026@cluster0.fuesl9b.mongodb.net/vaultDB?retryWrites=true&w=majority";
-mongoose.connect(MONGO_URI).then(() => console.log("🚀 VAULT FULL ENGINE ACTIVE")).catch(err => console.log(err));
+mongoose.connect(MONGO_URI)
+    .then(() => console.log("🚀 VAULT ENGINE: FULL POWER ACTIVE"))
+    .catch(err => console.error("DB Connection Error:", err));
 
-// --- SCHEMAS (Restored & Indexed) ---
+// --- SCHEMAS ---
 const User = mongoose.model('User', new mongoose.Schema({
     username: { type: String, unique: true, required: true, index: true },
     password: { type: String, required: true },
@@ -90,15 +92,14 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
     read: { type: Boolean, default: false }
 }));
 
-// --- RESTORED API ROUTES ---
+// --- API ROUTES ---
 
-// Auth
 app.post('/api/signup', async (req, res) => {
     try {
         const hashedPassword = await bcrypt.hash(req.body.password, 10);
         await User.create({ username: req.body.username, password: hashedPassword });
         res.json({ success: true });
-    } catch (err) { res.status(400).json({ error: "Taken" }); }
+    } catch (err) { res.status(400).json({ error: "Username taken" }); }
 });
 
 app.post('/api/login', async (req, res) => {
@@ -106,16 +107,15 @@ app.post('/api/login', async (req, res) => {
         const user = await User.findOne({ username: req.body.username }).lean();
         if (user && await bcrypt.compare(req.body.password, user.password)) {
             res.json({ message: "Access Granted", username: user.username, settings: user.settings });
-        } else { res.status(401).json({ error: "Invalid" }); }
-    } catch (err) { res.status(500).json({ error: "Err" }); }
+        } else { res.status(401).json({ error: "Invalid credentials" }); }
+    } catch (err) { res.status(500).json({ error: "Server error" }); }
 });
 
-// Posts & Social
 app.get('/api/posts', async (req, res) => {
     try {
         const posts = await Post.find().sort({ timestamp: -1 }).limit(20).lean();
         res.json(posts);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { res.status(500).json({ error: "Error fetching posts" }); }
 });
 
 app.post('/api/posts', async (req, res) => {
@@ -123,77 +123,22 @@ app.post('/api/posts', async (req, res) => {
         const user = await User.findOne({ username: req.body.sender }).select('profilePic').lean();
         const post = await Post.create({ ...req.body, senderPfp: user ? user.profilePic : "" });
         res.json(post);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { res.status(500).json({ error: "Post creation failed" }); }
 });
 
-app.post('/api/posts/:id/like', async (req, res) => {
-    try {
-        const post = await Post.findById(req.params.id);
-        if (!post.likedBy.includes(req.body.username)) {
-            post.likedBy.push(req.body.username);
-            post.likes += 1;
-            await post.save();
-            const notif = await Notification.create({ toUser: post.sender, fromUser: req.body.username, type: 'like' });
-            io.to(post.sender).emit('receive_notification', notif);
-            res.json({ success: true });
-        } else { res.json({ message: "Liked" }); }
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/follow', async (req, res) => {
-    const { me, target } = req.body;
-    try {
-        const myUser = await User.findOne({ username: me });
-        const isFollowing = myUser.following.includes(target);
-        if (!isFollowing) {
-            await Promise.all([
-                User.updateOne({ username: me }, { $addToSet: { following: target } }),
-                User.updateOne({ username: target }, { $addToSet: { followers: me } }),
-                Notification.create({ toUser: target, fromUser: me, type: 'follow' })
-            ]);
-            io.to(target).emit('receive_notification', { fromUser: me, type: 'follow' });
-            res.json({ success: true, following: true });
-        } else {
-            await Promise.all([
-                User.updateOne({ username: me }, { $pull: { following: target } }),
-                User.updateOne({ username: target }, { $pull: { followers: me } })
-            ]);
-            res.json({ success: true, following: false });
-        }
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Profile & Search
 app.get('/api/profile/:username', async (req, res) => {
     try {
         const user = await User.findOne({ username: req.params.username }).select('-password').lean();
+        if (!user) return res.status(404).json({ error: "User not found" });
         res.json(user);
-    } catch (err) { res.status(404).json({ error: "Not found" }); }
+    } catch (err) { res.status(500).json({ error: "Profile error" }); }
 });
 
-app.get('/api/users/search', async (req, res) => {
-    try {
-        const users = await User.find({ username: { $regex: req.query.q, $options: 'i' } }).select('username profilePic bio').limit(10).lean();
-        res.json(users);
-    } catch (err) { res.status(500).json({ error: "Err" }); }
-});
-
-// Notifications
 app.get('/api/notifications/:username', async (req, res) => {
     try {
         const notifs = await Notification.find({ toUser: req.params.username }).sort({ timestamp: -1 }).limit(20).lean();
         res.json(notifs);
-    } catch (err) { res.status(500).json({ error: "Err" }); }
-});
-
-// Messages & Chat List
-app.get('/api/messages/:me/:target', async (req, res) => {
-    try {
-        const msgs = await Message.find({
-            $or: [{ sender: req.params.me, receiver: req.params.target }, { sender: req.params.target, receiver: req.params.me }]
-        }).sort({ timestamp: 1 }).lean();
-        res.json(msgs);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { res.status(500).json({ error: "Notif error" }); }
 });
 
 app.get('/api/chat-list/:username', async (req, res) => {
@@ -203,24 +148,17 @@ app.get('/api/chat-list/:username', async (req, res) => {
         const partners = [...new Set(messages.map(m => m.sender === username ? m.receiver : m.sender))];
         const users = await User.find({ username: { $in: partners } }).select('username profilePic').lean();
         res.json(users.map(u => ({ ...u, type: 'private' })));
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { res.status(500).json({ error: "Chat list error" }); }
 });
 
-// Groups
-app.get('/api/groups/my-groups/:username', async (req, res) => {
-    try {
-        const groups = await Group.find({ members: req.params.username }).lean();
-        res.json(groups);
-    } catch (err) { res.status(500).json({ error: "Err" }); }
-});
-
-// HTML Routing
-app.get('*', (req, res) => {
-    const file = req.path === '/' ? 'index.html' : req.path.substring(1);
-    res.sendFile(path.join(__dirname, file.endsWith('.html') ? file : file + '.html'), (err) => {
-        if (err) res.sendFile(path.join(__dirname, 'index.html'));
+// HTML Routing - Robust catch-all
+app.get('/:page.html', (req, res) => {
+    res.sendFile(path.join(__dirname, req.params.page + '.html'), (err) => {
+        if (err) res.status(404).sendFile(path.join(__dirname, 'index.html'));
     });
 });
+
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 // --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
@@ -228,15 +166,12 @@ io.on('connection', (socket) => {
     socket.on('join_group', (id) => socket.join(id));
 
     socket.on('send_message', async (data) => {
-        const msg = await Message.create(data);
-        io.to(data.receiver).emit('receive_message', msg);
-        io.to(data.sender).emit('receive_message', msg);
-    });
-
-    socket.on('send_group_message', async (data) => {
-        const gMsg = await GroupMessage.create(data);
-        io.to(data.groupId).emit('receive_group_message', gMsg);
+        try {
+            const msg = await Message.create(data);
+            io.to(data.receiver).emit('receive_message', msg);
+            io.to(data.sender).emit('receive_message', msg);
+        } catch (e) { console.error(e); }
     });
 });
 
-server.listen(PORT, '0.0.0.0', () => console.log(`🚀 FULL POWER VAULT ON PORT ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`🚀 TURBO VAULT: PORT ${PORT}`));
