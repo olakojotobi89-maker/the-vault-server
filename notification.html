@@ -4,15 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Vault | Activity</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VaultChat">
+    <link rel="apple-touch-icon" href="vault-logo.png">
+    <link rel="apple-touch-startup-image" href="vault-logo.png">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root { --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); }
+        
         body { 
             margin: 0; padding: 0; min-height: 100dvh; 
             background: var(--primary-gradient); 
             font-family: -apple-system, sans-serif; color: white; 
         }
-        .container { width: 95%; max-width: 500px; margin: auto; padding: 20px 0 100px; }
+
+        .container { 
+            width: 95%; 
+            max-width: 500px; 
+            margin: auto; 
+            padding: 20px 0 120px;
+            padding-top: calc(20px + env(safe-area-inset-top)); /* Notch support */
+        }
 
         .header { 
             display: flex; justify-content: space-between; align-items: center; 
@@ -51,7 +67,11 @@
             background: rgba(0,0,0,0.7); backdrop-filter: blur(20px);
             border-radius: 30px; padding: 15px 30px; display: flex;
             justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: calc(15px + env(safe-area-inset-bottom)); /* Home bar support */
+            z-index: 1000;
         }
+        .nav-item { color: white; opacity: 0.6; font-size: 20px; text-decoration: none; }
+        .nav-item.active { opacity: 1; color: #fdbb2d; }
     </style>
 </head>
 <body>
@@ -68,13 +88,22 @@
     </div>
 
     <nav class="nav-bottom">
-        <a href="home.html" style="color:white; opacity:0.6;"><i class="fas fa-home"></i></a>
-        <a href="search.html" style="color:white; opacity:0.6;"><i class="fas fa-search"></i></a>
-        <a href="chat.html" style="color:white; opacity:0.6;"><i class="fas fa-comment-alt"></i></a>
-        <a href="notification.html" style="color:#fdbb2d;"><i class="fas fa-bell"></i></a>
+        <a href="home.html" class="nav-item"><i class="fas fa-home"></i></a>
+        <a href="search.html" class="nav-item"><i class="fas fa-search"></i></a>
+        <a href="chat.html" class="nav-item"><i class="fas fa-comment-alt"></i></a>
+        <a href="notification.html" class="nav-item active"><i class="fas fa-bell"></i></a>
     </nav>
 
     <script>
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Vault Activity PWA Ready'))
+                    .catch(err => console.log('PWA Error', err));
+            });
+        }
+
         const myName = localStorage.getItem('vault_username');
 
         async function loadNotifications() {
@@ -107,7 +136,6 @@
                     `;
                 }).join('');
                 
-                // Triggers the badge reset
                 markAsRead();
             } catch (err) { console.error(err); }
         }
