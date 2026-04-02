@@ -3,97 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Private Vault | Login</title>
+    <title>VaultChat | Secure Login</title>
     
     <link rel="manifest" href="/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="VaultChat">
     <link rel="apple-touch-icon" href="vault-logo.png">
-    <link rel="apple-touch-startup-image" href="vault-logo.png">
-
-    <link rel="stylesheet" href="style.css">
-
+    
     <script>
-        // AUTO-REDIRECT: If they are already logged in, don't show the login page
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW Error:', err));
+            });
+        }
+
+        // AUTO-REDIRECT: Keep them in the vault if logged in
         if (localStorage.getItem('vault_username')) {
             window.location.href = 'home.html';
         }
     </script>
 
     <style>
+        :root { --primary-gradient: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%); }
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
         body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            font-family: -apple-system, sans-serif;
+            margin: 0; padding: 0; height: 100dvh;
+            display: flex; justify-content: center; align-items: center;
+            background: var(--primary-gradient);
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
             overflow: hidden;
         }
+
         .login-card {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             padding: 40px 30px;
             border-radius: 40px;
-            width: 85%;
-            max-width: 350px;
+            width: 90%;
+            max-width: 380px;
             text-align: center;
             color: white;
-            box-shadow: 0 40px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 40px 60px rgba(0, 0, 0, 0.4);
+            margin-top: env(safe-area-inset-top);
         }
+
         .avatar {
-            font-size: 40px;
+            font-size: 35px;
             background: rgba(255, 255, 255, 0.1);
-            width: 80px;
-            height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 75px; height: 75px;
+            display: flex; align-items: center; justify-content: center;
             border-radius: 50%;
-            margin: 0 auto 20px;
-            border: 2px solid rgba(255, 255, 255, 0.5);
+            margin: 0 auto 15px;
+            border: 2px solid #fdbb2d;
+            color: #fdbb2d;
         }
+
+        h2 { margin: 10px 0 5px; font-size: 28px; letter-spacing: -1px; }
+        p { margin: 0 0 25px; opacity: 0.6; font-size: 14px; }
+
         input {
             width: 100%;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 15px;
-            border: none;
+            padding: 16px;
+            margin-bottom: 15px;
+            border-radius: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
             outline: none;
-            box-sizing: border-box;
+            font-size: 16px; /* Prevents iOS auto-zoom */
+            transition: 0.3s;
         }
+
+        input::placeholder { color: rgba(255, 255, 255, 0.4); }
+        input:focus { background: rgba(255, 255, 255, 0.15); border-color: rgba(255, 255, 255, 0.3); }
+
         .login-btn {
             width: 100%;
-            padding: 15px;
-            border-radius: 15px;
+            padding: 16px;
+            border-radius: 18px;
             border: none;
-            background: #00d2ff;
-            color: white;
-            font-weight: bold;
-            font-size: 18px;
+            background: #fdbb2d;
+            color: #1a2a6c;
+            font-weight: 800;
+            font-size: 17px;
             cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
         }
+
+        .login-btn:active { transform: scale(0.96); opacity: 0.9; }
+
         .auth-links {
-            margin-top: 20px;
+            margin-top: 25px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
         }
+
         .link {
             color: white;
             text-decoration: none;
             font-size: 14px;
-            opacity: 0.8;
+            opacity: 0.7;
+            transition: 0.2s;
         }
-        .link:hover {
-            opacity: 1;
-            text-decoration: underline;
-        }
+        
+        .link:active { opacity: 1; text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -101,57 +121,50 @@
     <div class="login-card">
         <div class="avatar">🔒</div>
         <h2>Private Vault</h2>
-        <p>Enter your custom password</p>
+        <p>Access your secure conversations</p>
         
         <form id="loginForm">
-            <input type="text" id="usernameInput" placeholder="Username" required>
-            <input type="password" id="passwordInput" placeholder="Password" required>
-            <button type="submit" class="login-btn">Unlock Chat</button>
+            <input type="text" id="usernameInput" placeholder="Username" required autocomplete="username">
+            <input type="password" id="passwordInput" placeholder="Password" required autocomplete="current-password">
+            <button type="submit" class="login-btn">Unlock Vault</button>
         </form>
 
         <div class="auth-links">
             <a href="forgot.html" class="link">Forgot Password?</a>
-            <a href="signup.html" class="link">Don't have an account? Register</a>
+            <a href="signup.html" class="link">Need an account? <b>Register</b></a>
         </div>
     </div>
 
     <script>
-    // PWA Service Worker Registration
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js')
-                .then(reg => console.log('Vault PWA Ready'))
-                .catch(err => console.log('PWA Error', err));
-        });
-    }
-
     async function handleAuth(type) {
+        const btn = document.querySelector('.login-btn');
         const username = document.getElementById('usernameInput').value;
         const password = document.getElementById('passwordInput').value;
 
-        const url = `/api/${type}`;
+        btn.innerText = "Authorizing...";
+        btn.disabled = true;
 
         try {
-            console.log(`📡 Sending ${type} request for:`, username);
-
-            const response = await fetch(url, {
+            const response = await fetch(`/api/${type}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
 
             const data = await response.json();
-            console.log("📥 Server Response:", data);
 
             if (response.ok) {
                 localStorage.setItem('vault_username', username);
                 window.location.href = 'home.html'; 
             } else {
-                alert("Vault Access Denied: " + (data.error || "Incorrect credentials"));
+                alert("Access Denied: " + (data.error || "Incorrect credentials"));
+                btn.innerText = "Unlock Vault";
+                btn.disabled = false;
             }
         } catch (err) {
-            console.error("❌ Fetch Error:", err);
-            alert("Connection Failed! Ensure your Vault Server is active.");
+            alert("Vault Offline. Please check your connection.");
+            btn.innerText = "Unlock Vault";
+            btn.disabled = false;
         }
     }
 
