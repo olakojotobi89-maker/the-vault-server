@@ -26,9 +26,9 @@ const server = http.createServer(app);
 const io = new Server(server, { 
     cors: { origin: "*", methods: ["GET", "POST"] },
     transports: ['websocket', 'polling'],
-    pingInterval: 10000,
+    pingInterval: 10000,   // SUPER FAST SOCKET
     pingTimeout: 5000,
-    maxHttpBufferSize: 1e6 // 1 MB payload max
+    allowEIO3: true
 });
 
 const PORT = process.env.PORT || 3000;
@@ -61,10 +61,10 @@ const MONGO_URI = "mongodb+srv://olakojotobi89_db_user:VaultPass2026@cluster0.fu
 
 // SPEED: Optimized connection pool
 mongoose.connect(MONGO_URI, {
-    maxPoolSize: 30, // increased pool size
+    maxPoolSize: 50, // SUPER FAST: increased pool
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
-    family: 4 // force IPv4
+    autoIndex: true, // SUPER FAST: auto index build
 }).then(() => console.log("🚀 DATABASE CONNECTED & OPTIMIZED")).catch(err => console.log(err));
 
 // --- SCHEMAS ---
@@ -131,7 +131,6 @@ const Notification = mongoose.model('Notification', new mongoose.Schema({
 }));
 
 // --- API ROUTES ---
-// Added .lean() to GET queries for super-fast response
 app.get('/api/messages/group/:groupId', async (req, res) => {
     try {
         const msgs = await GroupMessage.find({ groupId: req.params.groupId }).sort({ timestamp: 1 }).lean();
@@ -139,7 +138,6 @@ app.get('/api/messages/group/:groupId', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// All other API routes remain unchanged except GET queries now use .lean()
 app.post('/api/groups/create', async (req, res) => {
     try {
         const { name, admin, members, description, groupPic } = req.body;
@@ -189,17 +187,20 @@ app.get('/api/chat-list/:username', async (req, res) => {
         }).select('username profilePic').lean();
 
         const chatList = await Promise.all(users.map(async (u) => {
+
             const unreadCount = await Message.countDocuments({
                 sender: u.username,
                 receiver: username,
                 seen: false
             });
+
             return {
                 username: u.username,
                 profilePic: u.profilePic,
                 unreadCount,
                 type: 'private'
             };
+
         }));
 
         res.json(chatList);
@@ -207,36 +208,192 @@ app.get('/api/chat-list/:username', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- Other POST/GET routes remain exactly the same ---
+app.post('/api/posts/:id/comment', async (req, res) => {
+    try {
 
+        const post = await Post.findById(req.params.id);
 
-// --- SOCKET.IO ---
-io.on('connection', socket => {
-    socket.on('join_private', username => socket.join(username));
-    socket.on('join_group', groupId => socket.join(groupId));
+        if (!post) return res.status(404).json({ error: "Post not found" });
 
-    socket.on('send_message', async data => {
-        try {
-            const newMessage = await Message.create(data);
-            io.to(data.receiver).emit('receive_message', newMessage);
-            io.to(data.sender).emit('receive_message', newMessage);
-            io.to(data.receiver).emit('update_badge');
-        } catch (err) { console.error(err); }
-    });
+        post.comments.push({
+            user: req.body.username,
+            text: req.body.text
+        });
 
-    socket.on('send_group_message', async data => {
-        try {
-            const groupMsg = await GroupMessage.create(data);
-            io.to(data.groupId).emit('receive_group_message', groupMsg);
-        } catch (err) { console.error(err); }
-    });
+        await post.save();
 
-    socket.on('send_like', data => {
-        io.to(data.owner).emit('receive_like', { sender: data.sender, owner: data.owner });
-    });
+        if (post.sender !== req.body.username) {
+
+            const notif = await Notification.create({
+                toUser: post.sender,
+                fromUser: req.body.username,
+                type: 'comment'
+            });
+
+            io.to(post.sender).emit('receive_notification', notif);
+            io.to(post.sender).emit('update_badge');
+
+        }
+
+        res.json({ success: true });
+
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// SERVER LISTEN
+app.post('/api/follow', async (req, res) => {
+
+    const { me, target } = req.body;
+
+    if (!me || !target || me === target)
+        return res.status(400).json({ error: "Invalid usernames" });
+
+    try {
+
+        const myUser = await User.findOne({ username: me }).lean();
+
+        if (!myUser)
+            return res.status(404).json({ error: "User not found" });
+
+        const isFollowing = myUser.following.includes(target);
+
+        if (!isFollowing) {
+
+            const notif = await Notification.create({
+                toUser: target,
+                fromUser: me,
+                type: 'follow'
+            });
+
+            await Promise.all([
+                User.updateOne({ username: me }, { $addToSet: { following: target } }),
+                User.updateOne({ username: target }, { $addToSet: { followers: me } })
+            ]);
+
+            io.to(target).emit('receive_notification', notif);
+            io.to(target).emit('update_badge');
+
+            res.json({ success: true, following: true });
+
+        } else {
+
+            await Promise.all([
+                User.updateOne({ username: me }, { $pull: { following: target } }),
+                User.updateOne({ username: target }, { $pull: { followers: me } })
+            ]);
+
+            res.json({ success: true, following: false });
+
+        }
+
+    } catch (err) { res.status(500).json({ error: err.message }); }
+
+});
+
+app.post('/api/posts/:id/like', async (req, res) => {
+    try {
+
+        const post = await Post.findById(req.params.id);
+
+        if (!post.likedBy.includes(req.body.username)) {
+
+            post.likedBy.push(req.body.username);
+            post.likes += 1;
+
+            await post.save();
+
+            const notif = await Notification.create({
+                toUser: post.sender,
+                fromUser: req.body.username,
+                type: 'like'
+            });
+
+            io.to(post.sender).emit('receive_notification', notif);
+            io.to(post.sender).emit('update_badge');
+
+            res.json({ success: true });
+
+        } else {
+
+            res.json({ message: "Already liked" });
+
+        }
+
+    } catch (err) { res.status(500).json({ error: err.message }); }
+
+});
+
+app.get('/api/follow-status/:me/:target', async (req, res) => {
+
+    try {
+
+        const user = await User.findOne({ username: req.params.me }).lean();
+
+        const isFollowing = user
+            ? user.following.includes(req.params.target)
+            : false;
+
+        res.json({ isFollowing });
+
+    } catch (err) { res.status(500).json({ error: err.message }); }
+
+});
+
+app.get('/api/users/search', async (req, res) => {
+
+    const query = req.query.q;
+
+    if (!query) return res.json([]);
+
+    try {
+
+        const users = await User.find({
+            username: { $regex: '^' + query, $options: 'i' }
+        })
+        .select('username profilePic bio')
+        .limit(10)
+        .lean();
+
+        res.json(users);
+
+    } catch (err) {
+
+        res.status(500).json({ error: "Search failed" });
+
+    }
+
+});
+
+app.get('/api/profile/:username', async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.username })
+        .select('-password')
+        .lean();
+
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        res.json(user);
+
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/update-settings', async (req, res) => {
+    try {
+        const { username, settings } = req.body;
+        await User.findOneAndUpdate({ username }, { $set: settings });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/posts', async (req, res) => {
+    try {
+        const posts = await Post.find({}, null, { lean: true })
+        .sort({ timestamp: -1 })
+        .limit(10);
+
+        res.json(posts);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 SUPER TURBO VAULT SERVER ACTIVE ON PORT ${PORT}`);
+    console.log(`🚀 TURBO VAULT SERVER ACTIVE ON PORT ${PORT}`);
 });
